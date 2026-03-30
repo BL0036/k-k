@@ -1266,6 +1266,58 @@ input[type=number]{text-align:right;}
 }
 
 /* END VISUAL IMPROVEMENTS */
+
+/* ── GLOBAL QUICK SEARCH ── */
+.global-search-wrap{position:relative;flex:1;min-width:160px;max-width:280px;}
+.global-search-input{width:100%;padding:7px 14px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:#fff;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:.2s;}
+.global-search-input::placeholder{color:rgba(255,255,255,0.65);}
+.global-search-input:focus{background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.7);}
+.global-search-drop{display:none;position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--card);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.18);border:1px solid var(--border);z-index:9999;max-height:320px;overflow-y:auto;}
+.global-search-drop.open{display:block;}
+.gsd-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;transition:.12s;}
+.gsd-item:last-child{border-bottom:none;}
+.gsd-item:hover,.gsd-item.active{background:rgba(139,26,26,0.07);}
+.gsd-name{font-size:13px;font-weight:600;color:var(--text);}
+.gsd-meta{font-size:11px;color:var(--muted);}
+.gsd-bal{font-size:12px;font-weight:700;}
+.gsd-bal.pos{color:var(--red);}
+.gsd-bal.neg{color:var(--green);}
+.gsd-bal.zero{color:var(--muted);}
+.gsd-empty{padding:12px 14px;font-size:12px;color:var(--muted);font-style:italic;text-align:center;}
+@media(max-width:700px){.global-search-wrap{max-width:100%;order:5;flex-basis:100%;}}
+
+/* ── STICKY LEDGER TABLE HEADER ── */
+#detailTable thead tr th{position:sticky;top:0;z-index:10;background:var(--accent);}
+
+/* ── PARTY INFO CARD ── */
+.party-info-card{background:var(--card);border-radius:10px;padding:14px 18px;margin-bottom:14px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.party-avatar{width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;font-family:'Playfair Display',serif;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.party-info-main{flex:1;min-width:0;}
+.party-info-name{font-family:'Playfair Display',serif;font-size:18px;color:var(--accent);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.party-info-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.party-info-bal{text-align:right;flex-shrink:0;}
+.party-bal-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;}
+.party-bal-val{font-size:22px;font-weight:700;font-family:'Playfair Display',serif;margin-top:2px;}
+
+/* ── PARTICULAR PILLS ── */
+.particular-pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;}
+.pill-goods{background:#fdeaea;color:#8b1a1a;}
+.pill-cash{background:#e8f5ec;color:#1a6b3a;}
+.pill-cheque{background:#e8f0fe;color:#1a3a6b;}
+.pill-return{background:#fff3cd;color:#856404;}
+.pill-transport{background:#f3e8fe;color:#6b1a8b;}
+.pill-vat{background:#ffe8cc;color:#8b4a1a;}
+.pill-other{background:var(--row-even);color:var(--muted);}
+
+/* ── BILL ENTRY IMPROVEMENTS ── */
+.be-party-bal-strip{margin-top:6px;padding:7px 12px;border-radius:7px;background:var(--row-even);border:1px solid var(--border);font-size:12px;display:none;align-items:center;gap:10px;flex-wrap:wrap;}
+.be-party-bal-strip.show{display:flex;}
+.be-next-bn-hint{font-size:11px;color:var(--muted);margin-top:4px;padding-left:2px;}
+.bill-daily-total{padding:6px 12px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;font-size:13px;flex:none;}
+.bill-daily-total .dt-label{color:var(--muted);font-weight:600;}
+.bill-daily-total .dt-val{font-weight:700;font-family:'Playfair Display',serif;font-size:16px;color:var(--accent);}
+
+/* ── EXCEL IMPORT ── */
 </style>
 </head>
 <body>
@@ -1381,6 +1433,11 @@ input[type=number]{text-align:right;}
       <button class="nav-btn" onclick="showPage('billentry');closeHamburger()">🧾 Bill Entry</button>
       <button class="nav-btn" onclick="showPage('ledger');closeHamburger()">📋 Ledger</button>
       <button class="nav-btn" onclick="showPage('reports');closeHamburger()">🔍 Reports</button>
+    </div>
+    <!-- GLOBAL QUICK SEARCH -->
+    <div class="global-search-wrap" id="globalSearchWrap">
+      <input type="text" id="globalSearchInput" class="global-search-input" placeholder="🔍 Search party..." autocomplete="off" oninput="globalSearchInput()" onkeydown="globalSearchKey(event)">
+      <div class="global-search-drop" id="globalSearchDrop"></div>
     </div>
     <div class="hdr-actions">
       <button class="dark-toggle" onclick="toggleDark()" title="Toggle dark mode" id="darkBtn">🌙</button>
@@ -1630,17 +1687,25 @@ input[type=number]{text-align:right;}
     </div>
 
     <div id="ledgerDetail" style="display:none">
-      <div class="ledger-header">
+      <div class="ledger-header no-print" style="margin-bottom:10px;">
         <button class="back-btn no-print" onclick="showLedgerList()">← Back</button>
-        <div>
-          <div class="ledger-title" id="detailTitle">Party Name</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="detailMeta"></div>
-        </div>
         <div class="export-btns no-print">
           <button class="edit-btn" style="padding:7px 14px;font-size:12px" onclick="openEditParty(currentParty)">✏️ Edit</button>
           <button class="exp-btn exp-wa" onclick="shareWhatsApp()">📱 WhatsApp</button>
           <button class="exp-btn exp-xl" onclick="exportExcel()">📊 Excel</button>
           <button class="exp-btn exp-pdf" onclick="exportPDF()">🖨️ PDF</button>
+        </div>
+      </div>
+      <!-- PARTY INFO CARD -->
+      <div class="party-info-card no-print" id="partyInfoCard">
+        <div class="party-avatar" id="partyAvatar">K</div>
+        <div class="party-info-main">
+          <div class="party-info-name" id="detailTitle">Party Name</div>
+          <div class="party-info-meta" id="detailMeta"></div>
+        </div>
+        <div class="party-info-bal">
+          <div class="party-bal-label">Outstanding</div>
+          <div class="party-bal-val" id="partyBalVal">रू 0</div>
         </div>
       </div>
       <div class="ledger-summary" id="detailSummary"></div>
@@ -1725,8 +1790,22 @@ input[type=number]{text-align:right;}
         </div>
         <button class="bill-save-btn" id="beSaveBtn" onclick="saveBillEntry()">+ Save</button>
       </div>
+      <!-- PARTY BALANCE STRIP -->
+      <div class="be-party-bal-strip" id="bePartyBalStrip">
+        <span id="bePartyBalLabel" style="color:var(--muted);font-weight:600"></span>
+        <span id="bePartyBalAmt" style="font-weight:700"></span>
+        <span id="beValleyBadge"></span>
+      </div>
+      <!-- NEXT BILL HINT -->
+      <div class="be-next-bn-hint" id="beNextBnHint"></div>
       <div class="bill-log" id="billLogWrap">
-        <div class="bill-log-title">Today's entries<span class="bill-log-count" id="billLogCount" style="display:none"></span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+          <div class="bill-log-title" style="margin-bottom:0">Today's entries<span class="bill-log-count" id="billLogCount" style="display:none"></span></div>
+          <div class="bill-daily-total">
+            <span class="dt-label">Today's Sales:&nbsp;</span>
+            <span class="dt-val" id="billDailyTotal">रू 0</span>
+          </div>
+        </div>
         <table class="bill-log-table">
           <thead><tr><th>Bill No.</th><th>Party</th><th>Type</th><th>Amount</th><th>Date</th><th class="no-print"></th></tr></thead>
           <tbody id="billLogBody"></tbody>
@@ -1832,6 +1911,16 @@ input[type=number]{text-align:right;}
         </div>
         <div id="fyMsg" style="font-size:12px;color:var(--green);margin-top:8px;min-height:16px"></div>
       </div>
+      <div style="background:#e8f0fe;border-radius:8px;padding:16px;margin-top:12px;border:1px solid #b0c4f8">
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#1a3a6b">📊 Import from Excel</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Import transactions from your Excel ledger. Adds to existing parties only. Skips unknown parties. Flags duplicate bill numbers.</p>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;background:var(--card);border-radius:6px;padding:8px 10px;border:1px solid var(--border)">
+          <strong>Excel columns needed:</strong> <code>Party Name</code>, <code>Date</code>, <code>Bill No</code>, <code>Type</code>, <code>Amount</code>
+        </div>
+        <input type="file" id="xlImportFile" accept=".xlsx,.xls" style="display:none" onchange="importFromExcel(this)">
+        <button class="modal-save" style="width:auto;padding:10px 20px;background:#1a3a6b" onclick="document.getElementById('xlImportFile').click()">📂 Choose Excel File to Import</button>
+      </div>
+      <div id="xlImportReport" style="margin-top:12px;display:none;background:var(--card);border-radius:8px;padding:14px;border:1px solid var(--border);font-size:12px;max-height:300px;overflow-y:auto"></div>
       <div class="modal-saved" id="backupMsg" style="margin-top:12px"></div>
       <!-- Storage Usage Meter -->
       <div id="storageMeterWrap" style="margin-top:14px;background:var(--row-even);border-radius:8px;padding:12px 16px;border:1px solid var(--border)">
@@ -4444,6 +4533,288 @@ document.addEventListener('focusin', function(e){
   // Note: beDate is now a plain text input — no bsSelectDay patch needed.
   // Persistence is handled by the change listener attached in Phase 2.
 })();
+
+
+// ── GLOBAL QUICK SEARCH ──────────────────────────────────────
+let gsdIdx = -1;
+let gsdKeys = [];
+
+function globalSearchInput(){
+  const q = document.getElementById('globalSearchInput').value.toLowerCase().trim();
+  const drop = document.getElementById('globalSearchDrop');
+  gsdIdx = -1;
+  if(!q){ drop.innerHTML=''; drop.classList.remove('open'); return; }
+  gsdKeys = Object.keys(DB).filter(k=>
+    DB[k].name.toLowerCase().includes(q) || k.toLowerCase().includes(q)
+  ).sort((a,b)=>getBalance(b)-getBalance(a)).slice(0,8);
+  if(!gsdKeys.length){
+    drop.innerHTML='<div class="gsd-empty">No parties found</div>';
+    drop.classList.add('open'); return;
+  }
+  drop.innerHTML = gsdKeys.map((k,i)=>{
+    const p=DB[k]; const bal=getBalance(k);
+    const bc=bal>0?'pos':bal<0?'neg':'zero';
+    const balTxt=bal>0?'Dr '+fmt(bal):bal<0?'Cr '+fmt(Math.abs(bal)):'Nil';
+    const vBadge=(p.valley||'outside')==='inside'?'🏙️ Inside':'🏔️ Outside';
+    const hi=p.name.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong style="color:var(--accent)">$1</strong>');
+    return '<div class="gsd-item" data-key="'+k+'" onclick="gsdSelect(''+k+'')">'+
+      '<div><div class="gsd-name">'+hi+'</div><div class="gsd-meta">'+vBadge+(p.pan?' · PAN: '+p.pan:'')+'</div></div>'+
+      '<div class="gsd-bal '+bc+'">'+balTxt+'</div></div>';
+  }).join('');
+  drop.classList.add('open');
+}
+
+function globalSearchKey(e){
+  const drop = document.getElementById('globalSearchDrop');
+  const items = drop.querySelectorAll('.gsd-item');
+  if(e.key==='ArrowDown'){ e.preventDefault(); gsdIdx=Math.min(gsdIdx+1,items.length-1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); gsdIdx=Math.max(gsdIdx-1,0); }
+  else if(e.key==='Enter'){
+    e.preventDefault();
+    if(gsdIdx>=0 && gsdKeys[gsdIdx]) gsdSelect(gsdKeys[gsdIdx]);
+    else if(gsdKeys.length===1) gsdSelect(gsdKeys[0]);
+    return;
+  }
+  else if(e.key==='Escape'){
+    drop.classList.remove('open');
+    document.getElementById('globalSearchInput').blur();
+    return;
+  }
+  items.forEach((el,i)=>el.classList.toggle('active',i===gsdIdx));
+  if(items[gsdIdx]) items[gsdIdx].scrollIntoView({block:'nearest'});
+}
+
+function gsdSelect(key){
+  document.getElementById('globalSearchInput').value='';
+  document.getElementById('globalSearchDrop').classList.remove('open');
+  showPage('ledger');
+  viewParty(key);
+}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.global-search-wrap')){
+    const drop=document.getElementById('globalSearchDrop');
+    if(drop) drop.classList.remove('open');
+  }
+});
+
+// ── PARTY AVATAR + BALANCE in ledger detail ──────────────────
+(function(){
+  const _orig = viewParty;
+  viewParty = function(key){
+    _orig(key);
+    const p = DB[key];
+    if(!p) return;
+    const avatarEl = document.getElementById('partyAvatar');
+    if(avatarEl){
+      const letter = (p.name||'?')[0].toUpperCase();
+      avatarEl.textContent = letter;
+      const colors = ['#8b1a1a','#1a3a6b','#1a6b3a','#6b1a8b','#b8860b','#1a5a6b','#6b3a1a'];
+      avatarEl.style.background = colors[letter.charCodeAt(0)%colors.length];
+    }
+    const balEl = document.getElementById('partyBalVal');
+    if(balEl){
+      const bal = getBalance(key);
+      balEl.textContent = fmt(Math.abs(bal));
+      balEl.style.color = bal>0?'var(--red)':bal<0?'var(--green)':'var(--muted)';
+      const lbl = document.querySelector('.party-bal-label');
+      if(lbl) lbl.textContent = bal>0?'Outstanding':bal<0?'Advance':'Balanced';
+    }
+    // Particular pills
+    setTimeout(()=>{
+      document.querySelectorAll('#detailBody tr').forEach(row=>{
+        const cells = row.querySelectorAll('td');
+        if(cells.length>=3){
+          const partCell = cells[2];
+          const txt = partCell.textContent.trim();
+          if(txt && !partCell.querySelector('.particular-pill')){
+            const pillMap = {
+              'TO GOODS':'pill-goods','VAT BILL':'pill-vat','PAN BILL':'pill-goods',
+              'BY CASH':'pill-cash','BY CHEQUE':'pill-cheque',
+              'BY GOODS RETURN':'pill-return','GOODS RETURN':'pill-return',
+              'BY TRANSPORT':'pill-transport'
+            };
+            const cls = pillMap[txt]||'pill-other';
+            partCell.innerHTML = '<span class="particular-pill '+cls+'">'+txt+'</span>';
+          }
+        }
+      });
+    },60);
+  };
+})();
+
+// ── BILL ENTRY — party balance strip ─────────────────────────
+(function(){
+  const _orig = selectBeParty;
+  selectBeParty = function(key){
+    _orig(key);
+    const p = DB[key];
+    const bal = getBalance(key);
+    const strip = document.getElementById('bePartyBalStrip');
+    if(strip){
+      const lbl = document.getElementById('bePartyBalLabel');
+      const amt = document.getElementById('bePartyBalAmt');
+      const vbadge = document.getElementById('beValleyBadge');
+      if(lbl) lbl.textContent = bal>0?'Outstanding:':bal<0?'Advance:':'Balance:';
+      if(amt){
+        amt.textContent = bal===0?'Nil':fmt(Math.abs(bal));
+        amt.style.color = bal>0?'var(--red)':bal<0?'var(--green)':'var(--muted)';
+      }
+      if(vbadge) vbadge.textContent = (p.valley||'outside')==='inside'?'🏙️ Inside Valley':'🏔️ Outside Valley';
+      strip.classList.add('show');
+    }
+    updateNextBnHint();
+  };
+})();
+
+function updateNextBnHint(){
+  const hint = document.getElementById('beNextBnHint');
+  if(!hint) return;
+  let maxBn = 0;
+  Object.keys(DB).forEach(k=>{
+    DB[k].transactions.forEach(t=>{
+      if((t.particular==='TO GOODS'||t.particular==='VAT BILL') && t.bn){
+        const n = parseInt(t.bn);
+        if(!isNaN(n) && n>maxBn) maxBn=n;
+      }
+    });
+  });
+  if(maxBn>0){
+    hint.textContent = '💡 Last bill: ' + maxBn + '  —  Next expected: ' + (maxBn+1);
+    hint.style.display='block';
+  } else {
+    hint.style.display='none';
+  }
+}
+
+// Clear strip when party search cleared
+document.addEventListener('DOMContentLoaded',function(){
+  const bePS = document.getElementById('bePartySearch');
+  if(bePS){
+    bePS.addEventListener('input',function(){
+      if(!this.value.trim()){
+        const strip=document.getElementById('bePartyBalStrip');
+        if(strip) strip.classList.remove('show');
+      }
+    });
+  }
+});
+
+// ── BILL ENTRY — daily sales total ───────────────────────────
+(function(){
+  const _origRender = renderBillLog;
+  renderBillLog = function(){
+    _origRender();
+    const totalEl = document.getElementById('billDailyTotal');
+    if(!totalEl) return;
+    const salesTotal = billLog.filter(b=>b.isDebit).reduce((s,b)=>s+b.amount,0);
+    totalEl.textContent = fmt(salesTotal);
+  };
+})();
+
+// Show next BN hint when bill entry page opens
+(function(){
+  const _origShow = showPage;
+  showPage = function(name){
+    _origShow(name);
+    if(name==='billentry'){
+      updateNextBnHint();
+      if(!document.getElementById('beParty').value){
+        const strip=document.getElementById('bePartyBalStrip');
+        if(strip) strip.classList.remove('show');
+      }
+    }
+  };
+})();
+
+// ── EXCEL IMPORT ──────────────────────────────────────────────
+function importFromExcel(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reportEl = document.getElementById('xlImportReport');
+  const msgEl = document.getElementById('backupMsg');
+  reportEl.style.display='none';
+  reportEl.innerHTML='';
+  msgEl.textContent='Reading Excel file...';
+  loadSheetJS(()=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'binary'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+        if(!rows.length){ msgEl.textContent='❌ Excel file is empty.'; msgEl.style.color='var(--red)'; return; }
+        const colMap = {};
+        Object.keys(rows[0]).forEach(h=>{
+          const hl = h.toLowerCase().trim();
+          if(hl.includes('party')) colMap.party=h;
+          else if(hl.includes('date')) colMap.date=h;
+          else if(hl.includes('bill')||hl==='bn') colMap.bn=h;
+          else if(hl.includes('type')||hl.includes('particular')) colMap.type=h;
+          else if(hl.includes('amount')||hl.includes('debit')||hl.includes('dr')) colMap.amount=h;
+          else if(hl.includes('credit')||hl.includes('cr')) colMap.credit=h;
+          else if(hl.includes('note')||hl.includes('remark')) colMap.note=h;
+        });
+        if(!colMap.party){ msgEl.textContent='❌ Could not find Party Name column.'; msgEl.style.color='var(--red)'; return; }
+        const partyLookup={};
+        Object.keys(DB).forEach(k=>{ partyLookup[DB[k].name.toUpperCase().trim()]=k; });
+        let added=0,skippedParty=0;
+        const duplicates=[],addedLog=[],skippedPartyNames=new Set();
+        rows.forEach(row=>{
+          const partyName=String(row[colMap.party]||'').toUpperCase().trim();
+          if(!partyName) return;
+          const partyKey=partyLookup[partyName];
+          if(!partyKey){ skippedPartyNames.add(partyName); skippedParty++; return; }
+          const dateRaw=String(row[colMap.date]||'').trim();
+          const bn=String(row[colMap.bn]||'').trim();
+          const typeRaw=String(row[colMap.type]||'TO GOODS').toUpperCase().trim();
+          const amtRaw=parseFloat(row[colMap.amount]||0)||0;
+          const crRaw=parseFloat(row[colMap.credit]||0)||0;
+          const note=colMap.note?String(row[colMap.note]||'').trim():'';
+          if(amtRaw<=0&&crRaw<=0) return;
+          const creditTypes=['BY CASH','BY CHEQUE','BY GOODS RETURN','BY TRANSPORT','GOODS RETURN','OTHER_CR'];
+          const isCredit=creditTypes.some(ct=>typeRaw.includes(ct))||(crRaw>0&&amtRaw<=0);
+          const amount=isCredit?crRaw||amtRaw:amtRaw;
+          const particular=typeRaw==='VAT BILL'||typeRaw==='VAT'?'VAT BILL':
+            typeRaw==='TO GOODS'||typeRaw==='GOODS'||typeRaw==='PAN BILL'?'TO GOODS':typeRaw;
+          if(bn){
+            const dup=DB[partyKey].transactions.find(t=>t.bn&&t.bn.trim()===bn&&t.particular===particular);
+            if(dup){ duplicates.push({party:DB[partyKey].name,bn,date:dateRaw,amount,particular}); return; }
+          }
+          const tx={date:dateRaw,particular,bn,note,debit:isCredit?0:amount,credit:isCredit?amount:0,amount:0,runningBalance:0};
+          DB[partyKey].transactions.push(tx);
+          recalcBalances(partyKey);
+          added++;
+          addedLog.push({party:DB[partyKey].name,bn,date:dateRaw,particular,amount});
+        });
+        if(added>0){ saveDB(); populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats(); }
+        let html2='<div style="font-weight:700;font-size:13px;margin-bottom:10px">📊 Import Summary</div>';
+        html2+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">';
+        html2+='<div style="background:#e8f5ec;border-radius:6px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--green)">'+added+'</div><div style="font-size:10px;color:var(--muted)">ADDED</div></div>';
+        html2+='<div style="background:#fdeaea;border-radius:6px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--red)">'+duplicates.length+'</div><div style="font-size:10px;color:var(--muted)">DUPLICATES</div></div>';
+        html2+='<div style="background:var(--row-even);border-radius:6px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--muted)">'+skippedParty+'</div><div style="font-size:10px;color:var(--muted)">SKIPPED</div></div></div>';
+        if(duplicates.length){
+          html2+='<div style="font-weight:600;font-size:12px;color:var(--red);margin-bottom:6px">⚠ Duplicate Bills (not imported):</div>';
+          html2+='<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px"><tr style="background:var(--accent);color:#fff"><th style="padding:5px 8px;text-align:left">Party</th><th>Bill No</th><th>Type</th><th>Amount</th></tr>';
+          duplicates.forEach(d=>{ html2+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 8px">'+d.party+'</td><td style="padding:4px 8px;text-align:center">'+d.bn+'</td><td style="padding:4px 8px">'+d.particular+'</td><td style="padding:4px 8px;text-align:right">रू '+Number(d.amount).toLocaleString('en-IN')+'</td></tr>'; });
+          html2+='</table>';
+        }
+        if(skippedPartyNames.size){ html2+='<div style="font-weight:600;font-size:12px;color:var(--muted);margin-bottom:4px">Parties not found (skipped):</div><div style="font-size:11px;color:var(--muted)">'+[...skippedPartyNames].join(', ')+'</div>'; }
+        if(added>0){
+          html2+='<div style="font-weight:600;font-size:12px;color:var(--green);margin-top:10px;margin-bottom:4px">✅ Added ('+added+'):</div>';
+          html2+='<table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:var(--accent);color:#fff"><th style="padding:5px 8px;text-align:left">Party</th><th>Bill</th><th>Type</th><th>Amount</th><th>Date</th></tr>';
+          addedLog.forEach(d=>{ html2+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 8px">'+d.party+'</td><td style="padding:4px 8px;text-align:center">'+(d.bn||'—')+'</td><td style="padding:4px 8px">'+d.particular+'</td><td style="padding:4px 8px;text-align:right">रू '+Number(d.amount).toLocaleString('en-IN')+'</td><td style="padding:4px 8px">'+d.date+'</td></tr>'; });
+          html2+='</table>';
+        }
+        reportEl.innerHTML=html2; reportEl.style.display='block';
+        msgEl.textContent=added>0?'✓ Import complete! '+added+' transactions added.':'No new transactions added.';
+        msgEl.style.color=added>0?'var(--green)':'var(--muted)';
+      } catch(err){ msgEl.textContent='❌ Error: '+err.message; msgEl.style.color='var(--red)'; }
+      input.value='';
+    };
+    reader.readAsBinaryString(file);
+  });
+}
 
 </script>
 
