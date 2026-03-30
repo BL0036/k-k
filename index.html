@@ -4557,7 +4557,7 @@ function globalSearchInput(){
     const balTxt=bal>0?'Dr '+fmt(bal):bal<0?'Cr '+fmt(Math.abs(bal)):'Nil';
     const vBadge=(p.valley||'outside')==='inside'?'🏙️ Inside':'🏔️ Outside';
     const hi=p.name.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong style="color:var(--accent)">$1</strong>');
-    return '<div class="gsd-item" data-key="'+k+'" onclick="gsdSelect(''+k+'')">'+
+    return '<div class="gsd-item" data-key="'+k+'" onclick="gsdSelect(\'' + k + '\')">' +
       '<div><div class="gsd-name">'+hi+'</div><div class="gsd-meta">'+vBadge+(p.pan?' · PAN: '+p.pan:'')+'</div></div>'+
       '<div class="gsd-bal '+bc+'">'+balTxt+'</div></div>';
   }).join('');
