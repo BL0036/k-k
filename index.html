@@ -78,16 +78,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 /* ── LAYOUT ── */
 #app{display:none;min-height:100vh;}
-header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:0 16px;min-height:72px;height:auto;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,0.2),inset 0 -1px 0 rgba(184,134,11,0.3);flex-wrap:nowrap;gap:8px;border-bottom:2px solid rgba(184,134,11,0.35);}
+header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:0 16px;min-height:60px;height:auto;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,0.2),inset 0 -1px 0 rgba(184,134,11,0.3);flex-wrap:nowrap;gap:6px;border-bottom:2px solid rgba(184,134,11,0.35);overflow:visible;}
 .hdr-brand{display:flex;align-items:center;gap:12px;flex-shrink:0;}
 .hdr-logo{font-family:'Playfair Display',serif;font-size:18px;letter-spacing:.5px;text-shadow:0 1px 8px rgba(184,134,11,0.3);}
 .hdr-sub{font-size:11px;opacity:.75;margin-top:2px;}
 .hdr-nav{display:flex;gap:4px;flex-wrap:nowrap;flex-shrink:1;}
-.nav-btn{padding:6px 10px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;color:#fff;font-size:12px;font-weight:500;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.nav-btn{padding:5px 9px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;color:#fff;font-size:11px;font-weight:500;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
 .nav-btn.active,.nav-btn:hover{background:rgba(255,255,255,0.18);border-color:rgba(255,255,255,0.6);}
 .hdr-actions{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;}
-.logout-btn,.settings-btn{padding:5px 9px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-size:11px;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
-.logout-btn:hover{background:rgba(255,0,0,0.2);}
+.logout-btn,.settings-btn{padding:4px 8px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-size:10px;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.logout-btn{border-color:rgba(255,100,100,0.5);}
+.logout-btn:hover{background:rgba(255,0,0,0.25);}
 .settings-btn:hover{background:rgba(255,255,255,0.15);}
 .dark-toggle{padding:5px 8px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-size:14px;cursor:pointer;transition:.2s;white-space:nowrap;}
 .dark-toggle:hover{background:rgba(255,255,255,0.15);}
@@ -101,7 +102,7 @@ header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:0 1
 
 /* ── PAGES ── */
 .page{display:none;padding:20px 24px;}
-.page.active{display:block;}
+.page.active{display:block;min-height:calc(100vh - 110px);}
 /* Prevent inactive pages from contributing scroll height on file:// */
 .page:not(.active){height:0;overflow:hidden;padding:0;}
 
@@ -249,11 +250,17 @@ header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:0 1
 
 /* ── SYNC / CLOUD UI ── */
 #syncBar{padding:5px 16px;background:#162d52;color:#fff;font-size:11px;display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,0.1);}
-#syncBar .sync-left{display:flex;align-items:center;gap:8px;}
+#syncBar .sync-left{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+#syncBar .sync-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 #syncBar .sync-dot{width:8px;height:8px;border-radius:50%;background:#4caf50;flex-shrink:0;}
 #syncBar .sync-dot.offline{background:#f44336;}
 #syncBar .sync-dot.syncing{background:#ff9800;animation:pulse .8s ease-in-out infinite alternate;}
 #syncBar .sync-dot.pending{background:#ff9800;}
+#syncBar .global-search-wrap{flex:0 1 220px;min-width:130px;}
+#syncBar .global-search-input{padding:4px 11px;font-size:12px;border-radius:15px;border:1.5px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.12);color:#fff;width:100%;}
+#syncBar .global-search-input::placeholder{color:rgba(255,255,255,0.6);}
+#syncBar .global-search-input:focus{background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.7);outline:none;}
+#syncBar .global-search-drop{top:calc(100% + 6px);}
 @keyframes pulse{from{opacity:.4}to{opacity:1}}
 #syncBar .sync-btn{padding:3px 12px;border-radius:5px;border:1.5px solid rgba(255,255,255,.5);background:transparent;color:#fff;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.2s;}
 #syncBar .sync-btn:hover{background:rgba(255,255,255,.15);}
@@ -746,15 +753,12 @@ input[type=number]{text-align:right;}
     padding:6px 12px;
   }
   #syncBar .sync-left{flex:1;min-width:0;}
-  #syncBar > div:last-child{
-    display:flex;
-    gap:6px;
-    flex-wrap:wrap;
-    width:100%;
-  }
+  #syncBar .sync-right{width:100%;justify-content:flex-start;}
+  #syncBar .global-search-wrap{flex:1;min-width:120px;}
+  #syncBar .global-search-input{font-size:12px;}
   #syncBar .sync-btn{
     flex:1;
-    min-height:36px;
+    min-height:32px;
     font-size:11px;
     text-align:center;
   }
@@ -1236,6 +1240,7 @@ input[type=number]{text-align:right;}
 /* ── PAGE TRANSITIONS: subtle fade-in ── */
 .page.active{
   animation:pageFadeIn .18s ease;
+  min-height:calc(100vh - 110px);
 }
 @keyframes pageFadeIn{
   from{opacity:.7;transform:translateY(4px);}
@@ -1268,12 +1273,18 @@ input[type=number]{text-align:right;}
 /* END VISUAL IMPROVEMENTS */
 
 /* ── GLOBAL QUICK SEARCH ── */
-.global-search-wrap{position:relative;flex:1;min-width:160px;max-width:280px;}
+.global-search-wrap{position:relative;}
 .global-search-input{width:100%;padding:7px 14px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:#fff;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:.2s;}
 .global-search-input::placeholder{color:rgba(255,255,255,0.65);}
 .global-search-input:focus{background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.7);}
-.global-search-drop{display:none;position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--card);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.18);border:1px solid var(--border);z-index:9999;max-height:320px;overflow-y:auto;}
+.global-search-drop{display:none;position:absolute;top:calc(100% + 8px);left:0;right:0;min-width:260px;background:var(--card);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.18);border:1px solid var(--border);z-index:9999;max-height:320px;overflow-y:auto;}
 .global-search-drop.open{display:block;}
+/* Search in header nav */
+header .global-search-wrap{position:relative;flex:0 1 180px;min-width:110px;}
+header .global-search-input{padding:4px 11px;font-size:11px;border-radius:15px;border:1.5px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.12);color:#fff;width:100%;font-family:'DM Sans',sans-serif;outline:none;transition:.2s;}
+header .global-search-input::placeholder{color:rgba(255,255,255,0.6);}
+header .global-search-input:focus{background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.7);}
+header .global-search-drop{top:calc(100% + 6px);}
 .gsd-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;transition:.12s;}
 .gsd-item:last-child{border-bottom:none;}
 .gsd-item:hover,.gsd-item.active{background:rgba(139,26,26,0.07);}
@@ -1284,7 +1295,7 @@ input[type=number]{text-align:right;}
 .gsd-bal.neg{color:var(--green);}
 .gsd-bal.zero{color:var(--muted);}
 .gsd-empty{padding:12px 14px;font-size:12px;color:var(--muted);font-style:italic;text-align:center;}
-@media(max-width:700px){.global-search-wrap{max-width:100%;order:5;flex-basis:100%;}}
+/* global-search now in syncBar — no separate media rule needed */
 
 /* ── STICKY LEDGER TABLE HEADER ── */
 #detailTable thead tr th{position:sticky;top:0;z-index:10;background:var(--accent);}
@@ -1347,7 +1358,7 @@ input[type=number]{text-align:right;}
       <div class="sync-dot offline" id="syncDot"></div>
       <span id="syncStatus">Not connected to Firebase</span>
     </div>
-    <div style="display:flex;gap:6px">
+    <div class="sync-right">
       <button class="sync-btn" onclick="manualSync()" id="syncNowBtn" style="display:none">↻ Sync Now</button>
       <button class="sync-btn setup" onclick="openSetup()">⚙ Connect Firebase</button>
     </div>
@@ -1433,18 +1444,17 @@ input[type=number]{text-align:right;}
       <button class="nav-btn" onclick="showPage('billentry');closeHamburger()">🧾 Bill Entry</button>
       <button class="nav-btn" onclick="showPage('ledger');closeHamburger()">📋 Ledger</button>
       <button class="nav-btn" onclick="showPage('reports');closeHamburger()">🔍 Reports</button>
-    </div>
-    <!-- GLOBAL QUICK SEARCH -->
-    <div class="global-search-wrap" id="globalSearchWrap">
-      <input type="text" id="globalSearchInput" class="global-search-input" placeholder="🔍 Search party..." autocomplete="off" oninput="globalSearchInput()" onkeydown="globalSearchKey(event)">
-      <div class="global-search-drop" id="globalSearchDrop"></div>
+      <div class="global-search-wrap" id="globalSearchWrap" style="flex:0 1 180px;min-width:110px;">
+        <input type="text" id="globalSearchInput" class="global-search-input" placeholder="🔍 Search party..." autocomplete="off" oninput="globalSearchInput()" onkeydown="globalSearchKey(event)" style="font-size:11px;padding:4px 11px;">
+        <div class="global-search-drop" id="globalSearchDrop"></div>
+      </div>
     </div>
     <div class="hdr-actions">
       <button class="dark-toggle" onclick="toggleDark()" title="Toggle dark mode" id="darkBtn">🌙</button>
       <button class="settings-btn" onclick="openSettings()">⚙ Company</button>
       <button class="settings-btn" onclick="document.getElementById('changePwdModal').style.display='flex'" title="Change Password">🔑 Password</button>
       <button class="settings-btn" onclick="openBackup()" title="Backup & Restore data">💾 Backup</button>
-      <button class="logout-btn" onclick="doLogout()">Logout</button>
+      <button class="logout-btn" onclick="doLogout()">🚪 Logout</button>
     </div>
   </header>
 
@@ -2037,6 +2047,85 @@ const BS_MONTHS_NP = ['बैशाख','जेठ','असार','श्रा
 // BS month days for 2079-2090 (extended — was only up to 2085)
 // Source: Government of Nepal official BS calendar
 const BS_DAYS_DATA = {
+  2000:[30,32,31,32,31,30,30,30,29,30,29,31],
+  2001:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2002:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2003:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2004:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2005:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2006:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2007:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2008:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2009:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2010:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2011:[31,31,32,31,31,31,30,29,30,30,29,31],
+  2012:[31,31,32,32,31,30,30,29,30,29,30,30],
+  2013:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2014:[30,32,31,32,31,30,30,30,29,30,29,31],
+  2015:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2016:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2017:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2018:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2019:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2020:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2021:[31,31,32,31,31,31,30,29,30,30,29,31],
+  2022:[30,31,32,32,31,30,30,29,30,29,30,30],
+  2023:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2024:[30,32,31,32,31,30,30,30,29,30,29,31],
+  2025:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2026:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2027:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2028:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2029:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2030:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2031:[31,31,32,31,31,31,30,29,30,30,29,31],
+  2032:[30,31,32,32,31,30,30,29,30,29,30,30],
+  2033:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2034:[30,32,31,32,31,30,30,30,29,30,29,31],
+  2035:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2036:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2037:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2038:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2039:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2040:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2041:[31,31,32,31,31,31,30,29,30,30,29,31],
+  2042:[30,31,32,32,31,30,30,29,30,29,30,30],
+  2043:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2044:[30,32,31,32,31,30,30,30,29,30,29,31],
+  2045:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2046:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2047:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2048:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2049:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2050:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2051:[31,31,32,31,31,31,30,29,30,30,29,31],
+  2052:[30,31,32,32,31,30,30,29,30,29,30,30],
+  2053:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2054:[30,32,31,32,31,30,30,30,29,30,29,31],
+  2055:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2056:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2057:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2058:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2059:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2060:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2061:[31,31,32,31,31,31,30,29,30,30,30,30],
+  2062:[30,31,32,32,31,30,30,29,30,29,30,30],
+  2063:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2064:[30,32,31,32,31,30,30,30,29,30,29,31],
+  2065:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2066:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2067:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2068:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2069:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2070:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2071:[31,31,32,31,31,31,30,29,30,30,29,31],
+  2072:[31,31,32,32,31,30,30,29,30,29,30,30],
+  2073:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2074:[30,32,31,32,31,30,30,30,29,30,29,31],
+  2075:[31,31,32,32,31,30,30,30,29,30,29,31],
+  2076:[31,31,32,32,31,30,30,30,29,30,30,30],
+  2077:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2078:[31,32,31,32,31,30,30,30,29,30,29,31],
   2079:[31,32,31,32,31,30,30,30,29,29,30,30],
   2080:[31,31,32,32,31,30,30,30,29,30,30,30],
   2081:[31,31,32,32,31,30,30,30,29,30,29,31],
@@ -2248,6 +2337,8 @@ function _showNoFirebaseBanner(){
 function _hideNoFirebaseBanner(){
   const el = document.getElementById('noFirebaseBanner');
   if(el) el.style.display='none';
+  // Restore search to syncBar
+  const sw = document.getElementById('globalSearchWrap'); if(sw) sw.style.display='';
 }
 
 function setSyncing(msg){
@@ -2729,45 +2820,95 @@ function bsDateToDays(bsDate){
   const y=parseInt(parts[0]), m=parseInt(parts[1]), d=parseInt(parts[2]);
   return y*365 + m*30 + d;
 }
-// Compute approximate BS today from AD date
-// BS new year starts ~April 14. Baisakh=mid-Apr, Jestha=mid-May, ... Chaitra=mid-Mar
+// Compute BS today from AD date
+// Anchor: 2082-01-01 BS = 2025-04-14 AD (verified exact)
 function adToBsApprox(){
   const now = new Date();
-  // BS reference: 2000-01-01 BS = 1943-04-14 AD
-  const BS_EPOCH_AD = new Date(1943, 3, 14); // April 14, 1943
-  const diffMs = now - BS_EPOCH_AD;
-  const diffDays = Math.floor(diffMs / 86400000);
-  // Walk through BS years/months using BS_DAYS_DATA
-  let bsY = 2000, bsM = 1, bsD = 1;
-  let remaining = diffDays;
-  const years = Object.keys(BS_DAYS_DATA).map(Number).sort((a,b)=>a-b);
-  for(const yr of years){
-    const daysInYear = BS_DAYS_DATA[yr].reduce((s,d)=>s+d,0);
-    if(remaining < daysInYear){ bsY = yr; break; }
-    remaining -= daysInYear;
+  // Anchor: Baisakh 1, 2082 = April 14, 2025
+  const ANCHOR_AD = new Date(2025, 3, 14); // April 14, 2025
+  const ANCHOR_BS_Y = 2082, ANCHOR_BS_M = 1, ANCHOR_BS_D = 1;
+  let diffDays = Math.floor((now - ANCHOR_AD) / 86400000);
+  let bsY = ANCHOR_BS_Y, bsM = ANCHOR_BS_M - 1, bsD = ANCHOR_BS_D;
+  // diffDays can be negative (before anchor) — handle forward and backward
+  // Forward from anchor
+  while(diffDays > 0){
+    const months = BS_DAYS_DATA[bsY] || [31,31,32,31,31,31,30,29,30,29,30,30];
+    const daysInMonth = months[bsM];
+    const remaining = daysInMonth - bsD;
+    if(diffDays <= remaining){ bsD += diffDays; diffDays = 0; }
+    else { diffDays -= remaining + 1; bsD = 1; bsM++; if(bsM >= 12){ bsM = 0; bsY++; } }
   }
-  const months = BS_DAYS_DATA[bsY] || [31,31,32,32,31,30,30,30,29,30,29,31];
-  for(let mi=0; mi<12; mi++){
-    if(remaining < months[mi]){ bsM = mi+1; bsD = remaining+1; break; }
-    remaining -= months[mi];
+  // Backward from anchor (for dates before 2025-04-14)
+  while(diffDays < 0){
+    if(bsD > 1){ bsD--; diffDays++; }
+    else {
+      bsM--; if(bsM < 0){ bsM = 11; bsY--; }
+      const months = BS_DAYS_DATA[bsY] || [31,31,32,31,31,31,30,29,30,29,30,30];
+      bsD = months[bsM]; diffDays++;
+    }
   }
-  return `${bsY}-${String(bsM).padStart(2,'0')}-${String(bsD).padStart(2,'0')}`;
+  return `${bsY}-${String(bsM+1).padStart(2,'0')}-${String(bsD).padStart(2,'0')}`;
 }
 const BS_TODAY_APPROX = adToBsApprox();
 // Now that adToBsApprox is defined, set picker state to today and initialize lastEntryDate
 { const t=getTodayBS(); bsPickerState.year=t.year; bsPickerState.month=t.month; }
 if(!lastEntryDate) lastEntryDate = BS_TODAY_APPROX; // auto-set today's BS date
 function getAgingDays(key){
-  const lastDate = getLastDate(key);
-  if(!lastDate) return 0; // No transactions = brand new party, not overdue
-  const diff = bsDateToDays(BS_TODAY_APPROX) - bsDateToDays(lastDate);
-  return Math.max(0, diff);
+  const bal = getBalance(key);
+  // Settled or advance — no aging
+  if(bal <= 0) return -1;
+
+  const openingBal = safeNum(DB[key].opening_balance);
+  const txs = (DB[key].transactions || [])
+    .filter(t => t.date && t.particular !== 'TOTAL AMOUNT')
+    .slice().sort((a,b) => (a.date||'').localeCompare(b.date||''));
+
+  // Separate debits and collect total credits
+  const debits = txs.filter(t => safeNum(t.debit) > 0);
+  let remainingCredit = 0;
+  // If opening balance is negative = advance paid by party, counts as credit
+  if(openingBal < 0) remainingCredit += Math.abs(openingBal);
+  // Add all cash/credit transactions
+  for(const tx of txs) remainingCredit += safeNum(tx.credit);
+
+  // CASE 1: Positive opening balance = oldest unpaid debt, no date known for it
+  // Try to consume it with available credits first
+  if(openingBal > 0){
+    if(remainingCredit >= openingBal){
+      // Opening fully covered by credits — consume and move on to debits
+      remainingCredit -= openingBal;
+    } else {
+      // Opening NOT fully covered — it is the oldest unpaid amount
+      // Best anchor = first debit date (oldest goods date we actually have)
+      // If no debits exist, fall back to first tx date
+      const anchor = debits.length ? debits[0].date : (txs.length ? txs[0].date : null);
+      if(!anchor) return 0;
+      return Math.max(0, bsDateToDays(BS_TODAY_APPROX) - bsDateToDays(anchor));
+    }
+  }
+
+  // CASE 2: Walk debits oldest-first, consume credit pool
+  // The first debit that credits cannot fully cover = aging anchor
+  for(const tx of debits){
+    const dr = safeNum(tx.debit);
+    if(remainingCredit >= dr){
+      remainingCredit -= dr; // this bill fully paid by credits
+    } else {
+      // First unpaid bill — aging starts from this date
+      return Math.max(0, bsDateToDays(BS_TODAY_APPROX) - bsDateToDays(tx.date));
+    }
+  }
+
+  // CASE 3: No debits at all but balance > 0 (only opening bal, fully uncovered)
+  return 0;
 }
 function agingBadge(days){
-  if(days <= 30) return `<span class="aging-0">Current</span>`;
-  if(days <= 60) return `<span class="aging-30">30+ days</span>`;
-  if(days <= 90) return `<span class="aging-60">60+ days</span>`;
-  return `<span class="aging-90">90+ days</span>`;
+  if(days < 0)    return `<span class="aging-0">Settled</span>`;
+  if(days === 0)  return `<span class="aging-0">Today</span>`;
+  if(days <= 30)  return `<span class="aging-0">${days}d</span>`;
+  if(days <= 60)  return `<span class="aging-30">${days}d</span>`;
+  if(days <= 90)  return `<span class="aging-60">${days}d</span>`;
+  return `<span class="aging-90">${days}d</span>`;
 }
 
 // ── STATS ──
