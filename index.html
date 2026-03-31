@@ -145,6 +145,58 @@ header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:0 1
 .view-btn{padding:4px 10px;border-radius:5px;border:1.5px solid var(--accent);color:var(--accent);background:transparent;font-size:11px;font-weight:600;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;}
 .view-btn:hover{background:var(--accent);color:#fff;}
 
+/* ── RECEIPT ENTRY ── */
+.receipt-card{background:var(--card);border-radius:14px;padding:24px 28px;box-shadow:var(--shadow);border:1px solid var(--border);max-width:680px;margin:0 auto;}
+.rc-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;}
+.rc-form-grid .full{grid-column:1/-1;}
+.rc-type-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+.rc-pill{padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;}
+.rc-pill:hover{border-color:var(--green);color:var(--green);}
+.rc-pill.selected{background:var(--green);border-color:var(--green);color:#fff;}
+.rc-save-btn{margin-top:18px;padding:12px 32px;background:var(--green);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.2s;width:100%;}
+.rc-save-btn:hover{background:#145c2e;}
+.rc-party-strip{margin-top:12px;padding:10px 14px;background:var(--row-even);border-radius:8px;border:1px solid var(--border);font-size:12px;display:none;gap:12px;align-items:center;flex-wrap:wrap;}
+.rc-party-strip.show{display:flex;}
+
+/* ── RECEIPT PREVIEW MODAL ── */
+#receiptModal .modal-box{max-width:520px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh;}
+#receiptModal .receipt-preview{overflow-y:auto;flex:1 1 auto;}
+#receiptModal .rp-share-btns{flex-shrink:0;}
+.receipt-preview{font-family:'DM Sans',sans-serif;background:#fff;color:#1a1208;}
+.rp-header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:20px 24px;text-align:center;}
+.rp-company{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;letter-spacing:.5px;}
+.rp-company-sub{font-size:11px;opacity:.8;margin-top:3px;}
+.rp-title-bar{background:#b8860b;color:#fff;text-align:center;padding:8px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
+.rp-body{padding:20px 24px;}
+.rp-meta{display:flex;justify-content:space-between;font-size:12px;color:#6b5d4f;margin-bottom:16px;flex-wrap:wrap;gap:6px;}
+.rp-meta span strong{color:#1a1208;}
+.rp-received-from{font-size:13px;margin-bottom:16px;padding:10px 14px;background:#faf7f0;border-radius:8px;border-left:3px solid #8b1a1a;}
+.rp-received-from span{font-weight:700;color:#8b1a1a;font-size:15px;}
+.rp-amount-box{background:linear-gradient(135deg,#f0f7f0,#e8f5ec);border:2px solid #1a6b3a;border-radius:10px;padding:16px 20px;text-align:center;margin-bottom:16px;}
+.rp-amount-label{font-size:11px;color:#1a6b3a;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+.rp-amount-val{font-size:28px;font-weight:700;color:#1a6b3a;margin:4px 0;}
+.rp-amount-words{font-size:11px;color:#2d5a3a;font-style:italic;margin-top:2px;}
+.rp-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:12px;}
+.rp-detail-item{padding:8px 12px;background:#faf7f0;border-radius:6px;}
+.rp-detail-item .lbl{color:#6b5d4f;font-size:10px;text-transform:uppercase;font-weight:600;}
+.rp-detail-item .val{color:#1a1208;font-weight:600;margin-top:2px;}
+.rp-balance-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff3cd;border-radius:8px;border:1px solid #ffc107;margin-bottom:16px;font-size:13px;}
+.rp-balance-row.settled{background:#e8f5ec;border-color:#1a6b3a;}
+.rp-footer{border-top:1px dashed #d9cfc0;padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#6b5d4f;}
+.rp-sig{text-align:right;}
+.rp-sig-line{border-top:1px solid #1a1208;width:120px;margin-top:28px;margin-bottom:4px;}
+.rp-share-btns{display:flex;gap:10px;padding:16px 24px;background:#faf7f0;flex-wrap:wrap;}
+.rp-share-btn{flex:1;min-width:120px;padding:11px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.2s;}
+.rp-share-btn.wa{background:#25d366;color:#fff;}
+.rp-share-btn.wa:hover{background:#1ebe5d;}
+.rp-share-btn.pdf{background:#8b1a1a;color:#fff;}
+.rp-share-btn.pdf:hover{background:#5a0f0f;}
+.rp-share-btn.close{background:var(--border);color:var(--text);}
+@media print{
+  #receiptPrintArea{display:block!important;}
+  body > *:not(#receiptPrintArea){display:none!important;}
+}
+
 /* ── AGING BADGES ── */
 .aging-0{background:#e8f5ec;color:#1a6b3a;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:600;}
 .aging-0::before{content:'● ';font-size:8px;vertical-align:middle;}
@@ -1444,6 +1496,7 @@ header .global-search-drop{top:calc(100% + 6px);}
       <button class="nav-btn" onclick="showPage('billentry');closeHamburger()">🧾 Bill Entry</button>
       <button class="nav-btn" onclick="showPage('ledger');closeHamburger()">📋 Ledger</button>
       <button class="nav-btn" onclick="showPage('reports');closeHamburger()">🔍 Reports</button>
+      <button class="nav-btn" onclick="showPage('receipt');closeHamburger()">🧾 Receipt</button>
       <div class="global-search-wrap" id="globalSearchWrap" style="flex:0 1 180px;min-width:110px;">
         <input type="text" id="globalSearchInput" class="global-search-input" placeholder="🔍 Search party..." autocomplete="off" oninput="globalSearchInput()" onkeydown="globalSearchKey(event)" style="font-size:11px;padding:4px 11px;">
         <div class="global-search-drop" id="globalSearchDrop"></div>
@@ -1631,11 +1684,13 @@ header .global-search-drop{top:calc(100% + 6px);}
         </div>
         <div class="form-group">
           <label>Date (BS) * <span style="font-size:10px;color:var(--muted)">(YYYY-MM-DD, e.g. 2082-12-32)</span></label>
-          <input type="text" id="eDate" placeholder="2082-12-32" maxlength="10" autocomplete="off" style="background:var(--row-even)">
+          <input type="text" id="eDate" placeholder="2082-12-32" maxlength="10" autocomplete="off" style="background:var(--row-even)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('eBN').focus();}">
         </div>
         <div class="form-group">
           <label>Bill / Receipt No.</label>
-          <input type="text" id="eBN" placeholder="Bill number">
+          <input type="text" id="eBN" placeholder="Bill number"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('eAmount').focus();}">
         </div>
         <div class="form-group full">
           <label>Transaction Type *</label>
@@ -1652,15 +1707,18 @@ header .global-search-drop{top:calc(100% + 6px);}
         </div>
         <div class="form-group" id="otherLabelGroup" style="display:none">
           <label>Other Description</label>
-          <input type="text" id="eOtherLabel" placeholder="Enter description">
+          <input type="text" id="eOtherLabel" placeholder="Enter description"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('eAmount').focus();}">
         </div>
         <div class="form-group">
           <label>Amount (Rs.) *</label>
-          <input type="number" id="eAmount" placeholder="0.00" min="0" step="0.01">
+          <input type="number" id="eAmount" placeholder="0.00" min="0" step="0.01"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('eNote').focus();}">
         </div>
         <div class="form-group full">
           <label>Note / Remark</label>
-          <textarea id="eNote" placeholder="Optional note..."></textarea>
+          <textarea id="eNote" placeholder="Optional note..."
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitEntry();}"></textarea>
         </div>
       </div>
       <button class="submit-btn" onclick="submitEntry()">Save Transaction</button>
@@ -1685,6 +1743,7 @@ header .global-search-drop{top:calc(100% + 6px);}
         </select>
         <button class="add-party-btn" onclick="openAddParty()">➕ Add New Party</button>
         <button class="exp-btn exp-xl" style="font-size:12px" onclick="exportAllExcel()">📊 Export All to Excel</button>
+        <button class="exp-btn exp-pdf" style="font-size:12px" onclick="exportSummaryPDF()">🖨️ Summary PDF</button>
       </div>
       <div style="overflow-x:auto">
       <table class="party-table">
@@ -1823,6 +1882,93 @@ header .global-search-drop{top:calc(100% + 6px);}
       </div>
     </div>
   </div>
+
+  <!-- RECEIPT ENTRY PAGE -->
+  <div class="page" id="page-receipt">
+    <div class="page-title">🧾 Receipt Entry</div>
+    <div class="receipt-card">
+      <div class="enter-hint">💡 Collect payment from a party — save receipt &amp; share instantly via WhatsApp or PDF</div>
+      <br>
+      <div class="rc-form-grid">
+        <!-- Party -->
+        <div class="form-group full">
+          <label>Party Name * <span style="font-size:10px;color:var(--muted)">(type to search)</span></label>
+          <div class="party-search-wrap">
+            <input type="text" class="party-search-input" id="rcPartySearch" placeholder="🔍 Type party name..."
+              autocomplete="off" oninput="rcPartySearchInput()" onkeydown="rcPartySearchKey(event)" onfocus="rcPartySearchInput()">
+            <input type="hidden" id="rcParty">
+            <div class="party-ac-drop" id="rcPartyAcDrop"></div>
+          </div>
+          <!-- Party balance strip -->
+          <div class="rc-party-strip" id="rcPartyStrip">
+            <span id="rcPartyStripName" style="font-weight:700;color:var(--text)"></span>
+            <span style="color:var(--muted)">|</span>
+            <span id="rcPartyStripBal"></span>
+            <span id="rcPartyStripValley"></span>
+            <span id="rcPartyStripPhone" style="color:var(--blue)"></span>
+          </div>
+        </div>
+        <!-- Receipt No -->
+        <div class="form-group">
+          <label>Receipt No. *</label>
+          <input type="text" id="rcNo" placeholder="e.g. R-001" autocomplete="off">
+        </div>
+        <!-- Date -->
+        <div class="form-group">
+          <label>Date (BS) *</label>
+          <input type="text" id="rcDate" placeholder="2082-12-16" maxlength="10" autocomplete="off" style="background:var(--row-even)">
+        </div>
+        <!-- Payment Type -->
+        <div class="form-group full">
+          <label>Payment Type *</label>
+          <div class="rc-type-pills">
+            <div class="rc-pill selected" data-type="BY CASH" onclick="rcSelectType(this)">💵 By Cash</div>
+            <div class="rc-pill" data-type="BY CHEQUE" onclick="rcSelectType(this)">🏦 By Cheque</div>
+            <div class="rc-pill" data-type="BY TRANSPORT" onclick="rcSelectType(this)">🚛 By Transport</div>
+            <div class="rc-pill" data-type="BY GOODS RETURN" onclick="rcSelectType(this)">↩️ Goods Return</div>
+            <div class="rc-pill" data-type="OTHER_CR" onclick="rcSelectType(this)">📝 Other</div>
+          </div>
+        </div>
+        <!-- Cheque details (shown when BY CHEQUE) -->
+        <div class="form-group full" id="rcChequeGroup" style="display:none">
+          <label>Cheque No. / Bank</label>
+          <input type="text" id="rcChequeDetail" placeholder="e.g. Cheque No. 123456 - NIC Asia Bank">
+        </div>
+        <!-- Amount -->
+        <div class="form-group">
+          <label>Amount (Rs.) *</label>
+          <input type="number" id="rcAmount" placeholder="0.00" min="0" step="0.01" oninput="rcAmountInput()">
+        </div>
+        <!-- Balance after -->
+        <div class="form-group">
+          <label>Balance After Payment</label>
+          <input type="text" id="rcBalAfter" readonly style="background:var(--row-even);font-weight:700;color:var(--green);" placeholder="—">
+        </div>
+        <!-- Note -->
+        <div class="form-group full">
+          <label>Note / Remark <span style="font-size:10px;color:var(--muted)">(optional)</span></label>
+          <input type="text" id="rcNote" placeholder="e.g. Payment for Baisakh bills">
+        </div>
+      </div>
+      <button class="rc-save-btn" onclick="saveReceipt()">💾 Save &amp; Preview Receipt</button>
+    </div>
+  </div>
+
+  <!-- RECEIPT PREVIEW MODAL -->
+  <div class="modal-overlay" id="receiptModal" style="display:none">
+    <div class="modal-box" style="max-width:520px;padding:0;overflow:hidden;border-radius:14px;">
+      <div class="receipt-preview" id="receiptPreviewContent">
+        <!-- filled by JS -->
+      </div>
+      <div class="rp-share-btns">
+        <button class="rp-share-btn wa" onclick="rcShareWhatsApp()">📱 Share on WhatsApp</button>
+        <button class="rp-share-btn pdf" onclick="rcPrintPDF()">🖨️ Print / Save PDF</button>
+        <button class="rp-share-btn close" onclick="closeReceiptModal()">✕ Close</button>
+      </div>
+    </div>
+  </div>
+  <!-- Hidden print area for PDF -->
+  <div id="receiptPrintArea" style="display:none"></div>
 
   <!-- REPORTS PAGE -->
   <div class="page" id="page-reports">
@@ -2250,15 +2396,18 @@ function initDB(){
   checkStorageWarning();
   updateOnlineStatus();
   updateSyncBar();
+  // Fix valley field BEFORE Firebase sync so it doesn't get overwritten
+  migrateValleyField();
   // On startup always pull from Firebase — Firebase is master source of truth
   if(FIREBASE_URL && navigator.onLine){
     setTimeout(()=>{
       manualSync();
       // Start live listener after initial sync
       setTimeout(startLiveListener, 2000);
+      // Re-run valley migration after Firebase pull (Firebase may have old corrupted data)
+      setTimeout(migrateValleyField, 3500);
     }, 1000);
   }
-  migrateValleyField();
 }
 
 document.addEventListener('keydown', e=>{
@@ -3309,7 +3458,109 @@ function exportPDF(){
   win.document.write(html); win.document.close();
 }
 
-// ── EDIT TRANSACTION ──
+// ── EXPORT SUMMARY PDF ──
+function exportSummaryPDF(){
+  const keys = Object.keys(DB).sort((a,b)=>DB[a].name.localeCompare(DB[b].name));
+  if(!keys.length){ showToast('No parties to export','red'); return; }
+
+  const sort = document.getElementById('ledgerSort').value;
+  const search = document.getElementById('ledgerSearch').value.toLowerCase();
+  let filtered = keys.filter(k=>
+    DB[k].name.toLowerCase().includes(search) || k.toLowerCase().includes(search)
+  );
+  if(currentLedgerValleyTab==='inside')   filtered=filtered.filter(k=>(DB[k].valley||'outside')==='inside');
+  if(currentLedgerValleyTab==='outside')  filtered=filtered.filter(k=>(DB[k].valley||'outside')==='outside');
+  if(sort==='balance_desc') filtered.sort((a,b)=>getBalance(b)-getBalance(a));
+  else if(sort==='alpha')   filtered.sort((a,b)=>DB[a].name.localeCompare(DB[b].name));
+  else if(sort==='recent')  filtered.sort((a,b)=>getLastDate(b).localeCompare(getLastDate(a)));
+
+  let totalOpenBal=0, totalDr=0, totalCr=0, totalBal=0;
+  let rows='';
+  filtered.forEach((k,i)=>{
+    const p=DB[k];
+    const ob=safeNum(p.opening_balance);
+    const dr=getTotalDebit(k);
+    const cr=getTotalCredit(k);
+    const bal=getBalance(k);
+    totalOpenBal+=ob; totalDr+=dr; totalCr+=cr; totalBal+=bal;
+    const valleyTag=(p.valley||'outside')==='inside'?'<span style="background:#dbeafe;color:#1d4ed8;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:700">INSIDE</span>':'<span style="background:#fff3e0;color:#b45309;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:700">OUTSIDE</span>';
+    const balColor=bal>0?'#8b1a1a':bal<0?'#1a6b3a':'#555';
+    rows+=`<tr style="background:${i%2?'#fff':'#faf7f0'}">
+      <td style="padding:6px 10px">${i+1}</td>
+      <td style="padding:6px 10px"><b>${p.name}</b>&nbsp;${valleyTag}${p.pan?'<br><span style="font-size:9px;color:#888">PAN: '+p.pan+'</span>':''}</td>
+      <td style="padding:6px 10px;font-size:10px;color:#555">${p.phone||'—'}</td>
+      <td style="padding:6px 10px;text-align:right">${fmt(ob)}</td>
+      <td style="padding:6px 10px;text-align:right;color:#8b1a1a">${fmt(dr)}</td>
+      <td style="padding:6px 10px;text-align:right;color:#1a6b3a">${fmt(cr)}</td>
+      <td style="padding:6px 10px;text-align:right;font-weight:700;color:${balColor}">${fmt(bal)}</td>
+      <td style="padding:6px 10px;font-size:10px;color:#555">${getLastDate(k)||'—'}</td>
+    </tr>`;
+  });
+
+  const coInfo=[COMPANY.pan?'PAN: '+COMPANY.pan:'',COMPANY.addr,COMPANY.phone?'Ph: '+COMPANY.phone:'',COMPANY.email].filter(Boolean).join(' | ');
+  const valleyLabel = currentLedgerValleyTab==='inside'?'🏙️ Inside Valley':currentLedgerValleyTab==='outside'?'🏔️ Outside Valley':'All Parties';
+
+  const html=`<html><head><title>Ledger Summary</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:20px;color:#1a1208}
+    .header{text-align:center;border-bottom:3px solid #8b1a1a;padding-bottom:12px;margin-bottom:18px}
+    .co-name{font-size:20px;font-weight:bold;color:#8b1a1a;letter-spacing:1px}
+    .co-info{font-size:10px;color:#666;margin-top:3px}
+    .doc-title{font-size:13px;font-weight:bold;color:#444;margin-top:8px}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    th{background:#8b1a1a;color:#fff;padding:8px 10px;font-size:10px;text-align:left;font-weight:600}
+    th.r{text-align:right}
+    .totals-row td{background:#f0e8d8;font-weight:700;border-top:2px solid #8b1a1a;padding:7px 10px}
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+    .stat-box{border:1px solid #ddd;border-radius:6px;padding:10px 14px;text-align:center}
+    .stat-box .lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+    .stat-box .val{font-size:15px;font-weight:700;margin-top:4px}
+    .footer{text-align:right;font-size:9px;color:#aaa;margin-top:12px;border-top:1px solid #eee;padding-top:8px}
+    @media print{body{padding:10px}@page{margin:10mm;size:A4 landscape}}
+  </style></head><body>
+  <div class="header">
+    <div class="co-name">${COMPANY.name||'K & K TRADING CONCERN'}</div>
+    <div class="co-info">${coInfo}</div>
+    <div class="doc-title">Party Ledger — Summary Statement &nbsp;|&nbsp; ${valleyLabel} &nbsp;|&nbsp; FY 2082/83</div>
+    <div style="font-size:9px;color:#aaa;margin-top:3px">Printed: ${new Date().toLocaleString('en-IN')}</div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="lbl">Total Parties</div><div class="val" style="color:#1a3a6b">${filtered.length}</div></div>
+    <div class="stat-box"><div class="lbl">Total Sales (Dr.)</div><div class="val" style="color:#8b1a1a">${fmt(totalDr)}</div></div>
+    <div class="stat-box"><div class="lbl">Total Received (Cr.)</div><div class="val" style="color:#1a6b3a">${fmt(totalCr)}</div></div>
+    <div class="stat-box"><div class="lbl">Total Outstanding</div><div class="val" style="color:#8b1a1a">${fmt(totalBal)}</div></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th style="width:30px">#</th>
+      <th>Party Name</th>
+      <th>Phone</th>
+      <th class="r">Opening Bal.</th>
+      <th class="r">Total Sales (Dr.)</th>
+      <th class="r">Total Received (Cr.)</th>
+      <th class="r">Outstanding Balance</th>
+      <th>Last Entry</th>
+    </tr></thead>
+    <tbody>
+      ${rows}
+      <tr class="totals-row">
+        <td colspan="3">GRAND TOTAL (${filtered.length} parties)</td>
+        <td style="text-align:right">${fmt(totalOpenBal)}</td>
+        <td style="text-align:right;color:#8b1a1a">${fmt(totalDr)}</td>
+        <td style="text-align:right;color:#1a6b3a">${fmt(totalCr)}</td>
+        <td style="text-align:right;color:#8b1a1a">${fmt(totalBal)}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">${COMPANY.name||'K & K Trading Concern'} — Ledger Summary | Generated ${new Date().toLocaleString('en-IN')}</div>
+  <script>window.print();window.close();<\/script>
+  </body></html>`;
+
+  const win=window.open('','_blank','width=1100,height=750');
+  if(!win){ showToast('❌ Popup blocked! Allow popups for this page.','red'); return; }
+  win.document.write(html); win.document.close();
+}
 function openEditTx(key, idx){
   const t = DB[key].transactions[idx];
   if(!t) return;
@@ -3751,7 +4002,7 @@ function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const btns=['dashboard','entry','billentry','ledger','reports'];
+  const btns=['dashboard','entry','billentry','ledger','reports','receipt'];
   const idx=btns.indexOf(name);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   if(name==='entry'){
@@ -3781,6 +4032,11 @@ function showPage(name){
       document.getElementById('beBillNo').focus({preventScroll:true});
       window.scrollTo(0,0); document.documentElement.scrollTop=0; document.body.scrollTop=0;
     }, 80);
+  }
+  if(name==='receipt'){
+    const dateEl=document.getElementById('rcDate');
+    if(dateEl && !dateEl.value) dateEl.value=lastEntryDate||BS_TODAY_APPROX||'';
+    setTimeout(()=>{ const el=document.getElementById('rcPartySearch'); if(el) el.focus({preventScroll:true}); window.scrollTo(0,0); },80);
   }
   if(name!=='ledger') showLedgerList();
   // Scroll AFTER any pending layout — reliable on file:// too
@@ -3977,11 +4233,17 @@ function partySearchInput(){
   }
   drop.innerHTML = partyAcKeys.map((k,i)=>{
     const p=DB[k];
-    const v=(p.valley||'outside')==='inside'
+    const bal=getBalance(k);
+    const vBadge=(p.valley||'outside')==='inside'
       ? '<span class="badge-inside">INSIDE</span>'
       : '<span class="badge-outside">OUTSIDE</span>';
+    const balColor=bal>0?'var(--red)':bal<0?'var(--green)':'var(--muted)';
+    const balText=bal>0?fmt(bal)+' Dr':bal<0?fmt(Math.abs(bal))+' Cr':'Nil';
     const hi = p.name.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong>$1</strong>');
-    return `<div class="pac-item" data-key="${k}" onclick="selectPartyAc('${k}','entry')">${hi} ${v}</div>`;
+    return `<div class="pac-item" data-key="${k}" onclick="selectPartyAc('${k}','entry')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <span>${hi} ${vBadge}</span>
+      <span style="font-size:11px;font-weight:700;color:${balColor};flex-shrink:0">${balText}</span>
+    </div>`;
   }).join('');
   drop.classList.add('open');
 }
@@ -3996,7 +4258,8 @@ function partySearchKey(e){
     e.preventDefault();
     if(partyAcIdx>=0 && partyAcKeys[partyAcIdx]) selectPartyAc(partyAcKeys[partyAcIdx],'entry');
     else if(partyAcKeys.length===1) selectPartyAc(partyAcKeys[0],'entry');
-    else submitEntry();
+    // If party already selected and dropdown closed, move to date
+    else if(document.getElementById('eParty').value){ setTimeout(()=>document.getElementById('eDate').focus(),50); }
     return;
   }
   else if(e.key==='Escape'){ drop.classList.remove('open'); return; }
@@ -4019,7 +4282,7 @@ function selectPartyAc(key, ctx){
     const balLabel = bal > 0 ? 'Outstanding: '+fmt(bal) : bal < 0 ? 'Advance: '+fmt(Math.abs(bal)) : 'Balance: Nil';
     const infoEl = document.getElementById('ePartyInfo');
     if(infoEl) infoEl.innerHTML = `<span style="color:var(--blue)">${vTag}</span>${p.pan?' &nbsp;|&nbsp; PAN: '+p.pan:''} &nbsp;|&nbsp; <span style="color:${balColor};font-weight:600">${balLabel}</span>`;
-    setTimeout(()=>document.getElementById('eAmount').focus(), 50);
+    setTimeout(()=>document.getElementById('eDate').focus(), 50);
   }
 }
 
@@ -4064,8 +4327,18 @@ function bePartySearchInput(){
   ).sort((a,b)=>DB[a].name.localeCompare(DB[b].name)).slice(0,10);
   if(!matchKeys.length){ drop.innerHTML='<div class="pac-empty">No parties found</div>'; drop.classList.add('open'); return; }
   drop.innerHTML = matchKeys.map(k=>{
-    const hi = DB[k].name.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong>$1</strong>');
-    return `<div class="pac-item" data-key="${k}" onclick="selectBeParty('${k}')">${hi}</div>`;
+    const p=DB[k];
+    const bal=getBalance(k);
+    const vBadge=(p.valley||'outside')==='inside'
+      ? '<span class="badge-inside">INSIDE</span>'
+      : '<span class="badge-outside">OUTSIDE</span>';
+    const balColor=bal>0?'var(--red)':bal<0?'var(--green)':'var(--muted)';
+    const balText=bal>0?fmt(bal)+' Dr':bal<0?fmt(Math.abs(bal))+' Cr':'Nil';
+    const hi = p.name.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong>$1</strong>');
+    return `<div class="pac-item" data-key="${k}" onclick="selectBeParty('${k}')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <span>${hi} ${vBadge}</span>
+      <span style="font-size:11px;font-weight:700;color:${balColor};flex-shrink:0">${balText}</span>
+    </div>`;
   }).join('');
   drop.classList.add('open');
 }
@@ -4152,6 +4425,305 @@ function renderBillLog(){
 }
 
 function removeBillLogEntry(i){ billLog.splice(i,1); _saveBillLog(); renderBillLog(); }
+
+// ══════════════════════════════════════════════════════════════
+// ── RECEIPT ENTRY ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+let rcSelectedType = 'BY CASH';
+let _rcLastReceiptData = null; // store last saved receipt for share
+
+function rcSelectType(el){
+  document.querySelectorAll('.rc-pill').forEach(p=>p.classList.remove('selected'));
+  el.classList.add('selected');
+  rcSelectedType = el.dataset.type;
+  document.getElementById('rcChequeGroup').style.display = rcSelectedType==='BY CHEQUE' ? 'block' : 'none';
+}
+
+// ── Party autocomplete for receipt ──
+function rcPartySearchInput(){
+  const q = document.getElementById('rcPartySearch').value.toLowerCase().trim();
+  const drop = document.getElementById('rcPartyAcDrop');
+  const hidden = document.getElementById('rcParty');
+  if(!q){ drop.classList.remove('open'); drop.innerHTML=''; hidden.value=''; rcUpdateStrip(''); return; }
+  const matches = Object.keys(DB).filter(k=>DB[k].name.toLowerCase().includes(q)||k.toLowerCase().includes(q)).slice(0,8);
+  if(!matches.length){ drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(k=>`<div class="ac-item" data-key="${k}">${DB[k].name}<span style="font-size:10px;color:var(--muted);margin-left:6px">${(DB[k].valley||'outside')==='inside'?'🏙️':'🏔️'}</span></div>`).join('');
+  drop.classList.add('open');
+  drop.querySelectorAll('.ac-item').forEach(item=>{
+    item.onmousedown = ()=>{
+      hidden.value = item.dataset.key;
+      document.getElementById('rcPartySearch').value = DB[item.dataset.key].name;
+      drop.classList.remove('open');
+      rcUpdateStrip(item.dataset.key);
+      rcAmountInput();
+      setTimeout(()=>document.getElementById('rcNo').focus(),50);
+    };
+  });
+}
+function rcPartySearchKey(e){
+  const drop = document.getElementById('rcPartyAcDrop');
+  const items = drop.querySelectorAll('.ac-item');
+  let cur = [...items].findIndex(i=>i.classList.contains('active'));
+  if(e.key==='ArrowDown'){ if(cur<items.length-1){ if(cur>=0) items[cur].classList.remove('active'); items[cur+1].classList.add('active'); } e.preventDefault(); }
+  else if(e.key==='ArrowUp'){ if(cur>0){ items[cur].classList.remove('active'); items[cur-1].classList.add('active'); } e.preventDefault(); }
+  else if(e.key==='Enter'){
+    const active = drop.querySelector('.ac-item.active');
+    if(active){ active.onmousedown(); } else if(items.length===1){ items[0].onmousedown(); }
+    e.preventDefault();
+  }
+  else if(e.key==='Escape'){ drop.classList.remove('open'); }
+}
+function rcUpdateStrip(key){
+  const strip = document.getElementById('rcPartyStrip');
+  if(!key || !DB[key]){ strip.classList.remove('show'); return; }
+  const p = DB[key]; const bal = getBalance(key);
+  const balColor = bal>0?'var(--red)':bal<0?'var(--green)':'var(--muted)';
+  const balText = bal>0?'Outstanding: '+fmt(bal):bal<0?'Advance: '+fmt(Math.abs(bal)):'Fully Settled ✅';
+  document.getElementById('rcPartyStripName').textContent = p.name;
+  document.getElementById('rcPartyStripBal').innerHTML = `<span style="color:${balColor};font-weight:700">${balText}</span>`;
+  document.getElementById('rcPartyStripValley').innerHTML = (p.valley||'outside')==='inside'?'<span class="badge-inside">INSIDE</span>':'<span class="badge-outside">OUTSIDE</span>';
+  document.getElementById('rcPartyStripPhone').textContent = p.phone ? '📞 '+p.phone : '';
+  strip.classList.add('show');
+}
+function rcAmountInput(){
+  const key = document.getElementById('rcParty').value;
+  const amt = safeNum(document.getElementById('rcAmount').value);
+  const el = document.getElementById('rcBalAfter');
+  if(!key||!DB[key]||!amt){ el.value=''; return; }
+  const bal = getBalance(key);
+  const newBal = bal - amt;
+  el.value = (newBal>0?'Outstanding: ':newBal<0?'Advance: ':'Settled — ') + fmt(Math.abs(newBal));
+  el.style.color = newBal>0?'var(--red)':newBal<0?'var(--green)':'var(--green)';
+}
+
+// ── Amount to words (Nepali style) ──
+function amountToWords(n){
+  const a=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+    'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const b=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function words(num){
+    if(num===0) return '';
+    if(num<20) return a[num]+' ';
+    if(num<100) return b[Math.floor(num/10)]+' '+(num%10?a[num%10]+' ':'');
+    if(num<1000) return a[Math.floor(num/100)]+'  Hundred '+(num%100?words(num%100):'');
+    if(num<100000) return words(Math.floor(num/1000))+'Thousand '+(num%1000?words(num%1000):'');
+    if(num<10000000) return words(Math.floor(num/100000))+'Lakh '+(num%100000?words(num%100000):'');
+    return words(Math.floor(num/10000000))+'Crore '+(num%10000000?words(num%10000000):'');
+  }
+  const int = Math.floor(n), dec = Math.round((n-int)*100);
+  let str = (words(int)||'Zero ')+' Rupees';
+  if(dec) str += ' and '+words(dec)+' Paisa';
+  return str.replace(/\s+/g,' ').trim()+' Only';
+}
+
+// ── Save Receipt ──
+function saveReceipt(){
+  const party = document.getElementById('rcParty').value;
+  const rcNo  = document.getElementById('rcNo').value.trim();
+  const date  = document.getElementById('rcDate').value.trim();
+  const amt   = safeNum(document.getElementById('rcAmount').value);
+  const note  = document.getElementById('rcNote').value.trim();
+  const chequeDetail = document.getElementById('rcChequeDetail').value.trim();
+
+  if(!party){ showToast('Please select a party!','red'); document.getElementById('rcPartySearch').focus(); return; }
+  if(!rcNo){  showToast('Please enter a Receipt No.!','red'); document.getElementById('rcNo').focus(); return; }
+  if(!date){  showToast('Please enter a date!','red'); document.getElementById('rcDate').focus(); return; }
+  if(amt<=0){ showToast('Please enter a valid amount!','red'); document.getElementById('rcAmount').focus(); return; }
+
+  const balBefore = getBalance(party);
+  const particular = rcSelectedType;
+  const fullNote = chequeDetail ? (note ? note+' | '+chequeDetail : chequeDetail) : note;
+
+  // Check duplicate receipt no for this party
+  const dupes = checkDuplicateBN(party, rcNo);
+  if(dupes.length>0){
+    if(!confirm('⚠ Receipt No. '+rcNo+' already exists for this party. Save anyway?')) return;
+  }
+
+  // Save as credit transaction
+  _doSaveEntry({party, date, particular, bn:rcNo, amount:amt, note:fullNote, isDebit:false});
+
+  const balAfter = getBalance(party);
+
+  // Build receipt data for preview
+  _rcLastReceiptData = {
+    party, partyName:DB[party].name, partyAddress:DB[party].address||'',
+    partyPhone:DB[party].phone||'', partyPAN:DB[party].pan||'',
+    rcNo, date, type:rcSelectedType, chequeDetail, amount:amt,
+    note:fullNote, balBefore, balAfter
+  };
+
+  // Show preview modal
+  renderReceiptPreview(_rcLastReceiptData);
+  document.getElementById('receiptModal').style.display='flex';
+
+  // Reset form
+  document.getElementById('rcPartySearch').value='';
+  document.getElementById('rcParty').value='';
+  document.getElementById('rcNo').value='';
+  document.getElementById('rcAmount').value='';
+  document.getElementById('rcNote').value='';
+  document.getElementById('rcChequeDetail').value='';
+  document.getElementById('rcBalAfter').value='';
+  document.getElementById('rcPartyStrip').classList.remove('show');
+  // Auto-increment receipt number
+  const match = rcNo.match(/^(.*?)(\d+)$/);
+  if(match){
+    const nextNo = match[1]+(String(parseInt(match[2])+1).padStart(match[2].length,'0'));
+    document.getElementById('rcNo').value = nextNo;
+  }
+}
+
+function renderReceiptPreview(d){
+  const typeLabel = {
+    'BY CASH':'Cash','BY CHEQUE':'Cheque','BY TRANSPORT':'Transport',
+    'BY GOODS RETURN':'Goods Return','OTHER_CR':'Other'
+  }[d.type]||d.type;
+  const balSettled = d.balAfter<=0;
+  const balColor = d.balAfter>0?'#c0392b':d.balAfter<0?'#1a6b3a':'#1a6b3a';
+  const balText = d.balAfter>0?'Outstanding Balance: '+fmt(d.balAfter)
+    :d.balAfter<0?'Advance / Credit: '+fmt(Math.abs(d.balAfter))
+    :'✅ Account Fully Settled';
+
+  document.getElementById('receiptPreviewContent').innerHTML = `
+    <div class="rp-header">
+      <div class="rp-company">${COMPANY.name||'K & K TRADING CONCERN'}</div>
+      <div class="rp-company-sub">PAN: ${COMPANY.pan||''} &nbsp;|&nbsp; ${COMPANY.addr||''} ${COMPANY.phone?'&nbsp;|&nbsp; '+COMPANY.phone:''}</div>
+    </div>
+    <div class="rp-title-bar">Payment Receipt</div>
+    <div class="rp-body">
+      <div class="rp-meta">
+        <span><strong>Receipt No:</strong> ${d.rcNo}</span>
+        <span><strong>Date:</strong> ${d.date} (BS)</span>
+      </div>
+      <div class="rp-received-from">
+        Received from: <span>${d.partyName}</span>
+        ${d.partyAddress?'<br><span style="font-size:11px;color:#6b5d4f">'+d.partyAddress+'</span>':''}
+        ${d.partyPAN?'<span style="font-size:11px;color:#6b5d4f"> &nbsp;|&nbsp; PAN: '+d.partyPAN+'</span>':''}
+      </div>
+      <div class="rp-amount-box">
+        <div class="rp-amount-label">Amount Received</div>
+        <div class="rp-amount-val">${fmt(d.amount)}</div>
+        <div class="rp-amount-words">${amountToWords(d.amount)}</div>
+      </div>
+      <div class="rp-details">
+        <div class="rp-detail-item"><div class="lbl">Payment Mode</div><div class="val">${typeLabel}${d.chequeDetail?' — '+d.chequeDetail:''}</div></div>
+        <div class="rp-detail-item"><div class="lbl">Previous Balance</div><div class="val" style="color:#c0392b">${fmt(d.balBefore)}</div></div>
+        ${d.note?`<div class="rp-detail-item full" style="grid-column:1/-1"><div class="lbl">Note</div><div class="val">${d.note}</div></div>`:''}
+      </div>
+      <div class="rp-balance-row ${balSettled?'settled':''}">
+        <span style="font-weight:600">After this payment:</span>
+        <span style="font-weight:700;color:${balColor}">${balText}</span>
+      </div>
+    </div>
+    <div class="rp-footer">
+      <div style="font-size:10px;line-height:1.8">
+        <strong>Thank you for your payment!</strong><br>
+        ${COMPANY.email||''} ${COMPANY.extra||''}
+      </div>
+      <div class="rp-sig">
+        <img src="data:image/png;base64,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" style="width:100px;height:100px;object-fit:contain;display:block;margin-bottom:2px;opacity:0.85">
+        <div>Authorised Signature</div>
+        <div style="font-size:10px;margin-top:2px">${COMPANY.name||''}</div>
+      </div>
+    </div>
+  `;
+}
+
+function closeReceiptModal(){
+  document.getElementById('receiptModal').style.display='none';
+  _rcLastReceiptData = null;
+}
+
+// ── WhatsApp Share ──
+function rcShareWhatsApp(){
+  if(!_rcLastReceiptData) return;
+  const d = _rcLastReceiptData;
+  const typeLabel={'BY CASH':'Cash','BY CHEQUE':'Cheque','BY TRANSPORT':'Transport','BY GOODS RETURN':'Goods Return','OTHER_CR':'Other'}[d.type]||d.type;
+  const balLine = d.balAfter>0?'Outstanding Balance: '+fmt(d.balAfter)
+    :d.balAfter<0?'Advance/Credit: '+fmt(Math.abs(d.balAfter))
+    :'✅ Account Fully Settled';
+  const phone = d.partyPhone ? d.partyPhone.replace(/[^0-9]/g,'') : '';
+  const msg =
+    `🧾 *PAYMENT RECEIPT*
+`+
+    `━━━━━━━━━━━━━━━━
+`+
+    `*${COMPANY.name||'K & K TRADING CONCERN'}*
+`+
+    `${COMPANY.addr||''}
+`+
+    `━━━━━━━━━━━━━━━━
+`+
+    `Receipt No: *${d.rcNo}*
+`+
+    `Date: *${d.date}* (BS)
+
+`+
+    `Received from: *${d.partyName}*
+`+
+    `Payment Mode: ${typeLabel}${d.chequeDetail?' ('+d.chequeDetail+')':''}
+
+`+
+    `Amount Received: *${fmt(d.amount)}*
+`+
+    `_(${amountToWords(d.amount)})_
+
+`+
+    `Previous Balance: ${fmt(d.balBefore)}
+`+
+    `*${balLine}*
+`+
+    `━━━━━━━━━━━━━━━━
+`+
+    `${d.note?'Note: '+d.note+'\n':''}`+
+    `Thank you for your payment! 🙏`;
+  const url = phone
+    ? `https://wa.me/977${phone}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url,'_blank');
+}
+
+// ── Print / PDF ──
+function rcPrintPDF(){
+  if(!_rcLastReceiptData) return;
+  const receiptContent = document.getElementById('receiptPreviewContent').innerHTML;
+  const printStyles = '<style>' +
+    '@import url(\'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;600;700&display=swap\');' +
+    '*{box-sizing:border-box;margin:0;padding:0;}' +
+    'body{margin:0;font-family:\'DM Sans\',sans-serif;background:#fff;color:#1a1208;}' +
+    '.rp-header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:20px 24px;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-company{font-family:\'Playfair Display\',serif;font-size:20px;font-weight:700;}' +
+    '.rp-company-sub{font-size:11px;opacity:.8;margin-top:3px;}' +
+    '.rp-title-bar{background:#b8860b;color:#fff;text-align:center;padding:8px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-body{padding:20px 24px;}' +
+    '.rp-meta{display:flex;justify-content:space-between;font-size:12px;color:#6b5d4f;margin-bottom:16px;flex-wrap:wrap;gap:6px;}' +
+    '.rp-received-from{font-size:13px;margin-bottom:16px;padding:10px 14px;background:#faf7f0;border-radius:8px;border-left:3px solid #8b1a1a;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-received-from span{font-weight:700;color:#8b1a1a;font-size:15px;}' +
+    '.rp-amount-box{background:#e8f5ec;border:2px solid #1a6b3a;border-radius:10px;padding:16px 20px;text-align:center;margin-bottom:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-amount-label{font-size:11px;color:#1a6b3a;font-weight:600;text-transform:uppercase;letter-spacing:1px;}' +
+    '.rp-amount-val{font-size:28px;font-weight:700;color:#1a6b3a;margin:4px 0;}' +
+    '.rp-amount-words{font-size:11px;color:#2d5a3a;font-style:italic;}' +
+    '.rp-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:12px;}' +
+    '.rp-detail-item{padding:8px 12px;background:#faf7f0;border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-detail-item .lbl{color:#6b5d4f;font-size:10px;text-transform:uppercase;font-weight:600;}' +
+    '.rp-detail-item .val{color:#1a1208;font-weight:600;margin-top:2px;}' +
+    '.rp-balance-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff3cd;border-radius:8px;border:1px solid #ffc107;margin-bottom:16px;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-balance-row.settled{background:#e8f5ec;border-color:#1a6b3a;}' +
+    '.rp-footer{border-top:1px dashed #d9cfc0;padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#6b5d4f;}' +
+    '.rp-sig{text-align:right;}' +
+    '.rp-sig-line{border-top:1px solid #1a1208;width:120px;margin-top:28px;margin-bottom:4px;}' +
+    '@media print{body{margin:0;}@page{margin:10mm;}}' +
+    '</style>';
+  // Open dedicated popup — main app stays visible and untouched
+  var pw = window.open('', '_blank', 'width=620,height=850');
+  if(!pw){ showToast('\u274C Popup blocked! Please allow popups for this page.', 'red'); return; }
+  pw.document.open();
+  pw.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt - ' + (_rcLastReceiptData.rcNo||'') + '</title>' + printStyles + '</head><body>' + receiptContent + '</body></html>');
+  pw.document.close();
+  pw.onload = function(){ pw.focus(); pw.print(); };
+  setTimeout(function(){ try{ pw.focus(); pw.print(); }catch(e){} }, 900);
+}
 
 // ── PHASE 4: BILL SERIAL GAP CHECKER ──
 function runGapCheck(){
@@ -4297,9 +4869,17 @@ function exportGapExcel(){
 function migrateValleyField(){
   let changed=false;
   Object.keys(DB).forEach(k=>{
-    if(!DB[k].valley){ DB[k].valley='outside'; changed=true; }
-    // Ensure valley from RAW is respected if party was just merged
-    if(RAW[k] && RAW[k].valley && !DB[k].valley){ DB[k].valley=RAW[k].valley; changed=true; }
+    if(!DB[k].valley){
+      // Prefer the valley value from RAW (hardcoded data) if available
+      DB[k].valley = (RAW[k] && RAW[k].valley) ? RAW[k].valley : 'outside';
+      changed=true;
+    }
+    // Force-correct valley from RAW for parties that exist in RAW with explicit valley
+    // (fixes parties wrongly set to 'outside' by old buggy migration)
+    if(RAW[k] && RAW[k].valley && DB[k].valley !== RAW[k].valley){
+      DB[k].valley = RAW[k].valley;
+      changed=true;
+    }
   });
   if(changed){ saveDB(); }
 }
@@ -4576,6 +5156,65 @@ if ('serviceWorker' in navigator) {
         }
       }
       return;
+    }
+
+    // ── Receipt Entry form ───────────────────────────────────────
+    const rcPage = document.getElementById('page-receipt');
+    if(rcPage && rcPage.contains(active)){
+      if(active.tagName === 'INPUT' && (active.disabled || active.type === 'hidden' || active.readOnly)) return;
+
+      // Party search: wait for dropdown to close
+      if(active.id === 'rcPartySearch'){
+        const drop = document.getElementById('rcPartyAcDrop');
+        const dropOpen = drop && drop.innerHTML.trim() !== '' && drop.style.display !== 'none';
+        if(dropOpen) return;
+        const party = document.getElementById('rcParty').value;
+        if(party){ e.preventDefault(); document.getElementById('rcNo').focus(); }
+        return;
+      }
+
+      // rcNo → rcDate
+      if(active.id === 'rcNo'){
+        e.preventDefault(); document.getElementById('rcDate').focus(); return;
+      }
+
+      // rcDate → rcAmount (validate format first)
+      if(active.id === 'rcDate'){
+        const val = (active.value||'').trim();
+        if(val && !isValidBsDate(val)){
+          e.preventDefault();
+          showToast('⚠ Date format: YYYY-MM-DD (e.g. 2082-12-16)', 'red');
+          return;
+        }
+        e.preventDefault(); document.getElementById('rcAmount').focus(); return;
+      }
+
+      // rcAmount → rcChequeDetail (if visible) else rcNote
+      if(active.id === 'rcAmount'){
+        e.preventDefault();
+        const chequeGroup = document.getElementById('rcChequeGroup');
+        const chequeVisible = chequeGroup && chequeGroup.style.display !== 'none';
+        if(chequeVisible){ document.getElementById('rcChequeDetail').focus(); }
+        else { document.getElementById('rcNote').focus(); }
+        return;
+      }
+
+      // rcChequeDetail → rcNote
+      if(active.id === 'rcChequeDetail'){
+        e.preventDefault(); document.getElementById('rcNote').focus(); return;
+      }
+
+      // rcNote → Save (if form ready)
+      if(active.id === 'rcNote'){
+        e.preventDefault();
+        const party = document.getElementById('rcParty').value;
+        const rcNo  = document.getElementById('rcNo').value.trim();
+        const date  = document.getElementById('rcDate').value.trim();
+        const amt   = parseFloat(document.getElementById('rcAmount').value)||0;
+        if(party && rcNo && date && amt>0){ saveReceipt(); }
+        else { showToast('⚠ Fill Party, Receipt No, Date and Amount', 'red'); }
+        return;
+      }
     }
 
     // Any other context → do not intercept
