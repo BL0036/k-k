@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- ── CACHE CONTROL: always fetch fresh HTML from GitHub Pages ── -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>KK Ledger</title>
 
 <!-- PWA Meta Tags -->
@@ -82,22 +86,32 @@ header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:0 1
 .hdr-brand{display:flex;align-items:center;gap:12px;flex-shrink:0;}
 .hdr-logo{font-family:'Playfair Display',serif;font-size:18px;letter-spacing:.5px;text-shadow:0 1px 8px rgba(184,134,11,0.3);}
 .hdr-sub{font-size:11px;opacity:.75;margin-top:2px;}
-.hdr-nav{display:flex;gap:4px;flex-wrap:nowrap;flex-shrink:1;}
+/* hdr-nav can shrink but never causes actions to be pushed off screen */
+.hdr-nav{display:flex;gap:4px;flex-wrap:nowrap;flex-shrink:1;min-width:0;overflow:hidden;}
 .nav-btn{padding:5px 9px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;color:#fff;font-size:11px;font-weight:500;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
 .nav-btn.active,.nav-btn:hover{background:rgba(255,255,255,0.18);border-color:rgba(255,255,255,0.6);}
-.hdr-actions{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;}
+/* hdr-actions never shrinks — Backup & Logout always stay visible */
+.hdr-actions{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;margin-left:auto;}
 .logout-btn,.settings-btn{padding:4px 8px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-size:10px;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
 .logout-btn{border-color:rgba(255,100,100,0.5);}
 .logout-btn:hover{background:rgba(255,0,0,0.25);}
 .settings-btn:hover{background:rgba(255,255,255,0.15);}
 .dark-toggle{padding:5px 8px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-size:14px;cursor:pointer;transition:.2s;white-space:nowrap;}
 .dark-toggle:hover{background:rgba(255,255,255,0.15);}
-/* Medium screens: hide brand sub-text to save space */
-@media(max-width:1100px){
+/* Medium screens (701–1100px): wrap nav to second row so actions stay on row-1 */
+@media(max-width:1100px) and (min-width:701px){
+  header{flex-wrap:wrap;padding:8px 16px;row-gap:6px;}
+  .hdr-brand{flex:0 0 auto;order:1;}
+  .hdr-actions{flex:0 0 auto;order:2;margin-left:auto;}
+  .hdr-nav{flex:0 1 100%;order:3;flex-wrap:wrap;overflow:visible;min-width:0;}
   .hdr-sub{display:none;}
   .hdr-logo{font-size:15px;}
   .nav-btn{font-size:11px;padding:5px 8px;}
   .logout-btn,.settings-btn{font-size:10px;padding:4px 7px;}
+}
+/* Small screens (≤700px): hamburger handles nav; actions wrap if needed */
+@media(max-width:700px){
+  .hdr-actions{flex-wrap:wrap;flex-shrink:0;margin-left:auto;}
 }
 
 /* ── PAGES ── */
@@ -515,8 +529,9 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
     gap:8px;
     min-height:auto;
   }
-  .hdr-brand{flex-basis:auto;}
-  .hdr-actions{flex-wrap:wrap;gap:6px;}
+  .hdr-brand{flex-basis:auto;flex-shrink:0;}
+  /* Actions must never shrink or hide on mobile */
+  .hdr-actions{flex-wrap:wrap;gap:6px;flex-shrink:0;margin-left:auto;}
 
   /* Tables — horizontal scroll padding + readability */
   .party-table,
@@ -1323,6 +1338,161 @@ input[type=number]{text-align:right;}
 }
 
 /* END VISUAL IMPROVEMENTS */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 7 — MOBILE UX IMPROVEMENTS
+   Targets: Bill Entry, Ledger Share, Receipt Entry & Modal,
+            Table action buttons (edit/delete in rows)
+   All rules inside @media guards — desktop unchanged.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── P7-A: Bill Entry — date+save row: stack on mobile ──────── */
+@media(max-width:600px){
+  /* Override the hardcoded width:150px on the date input */
+  #beDate{
+    width:100% !important;
+    min-height:48px;
+    font-size:16px !important;
+    padding:11px 13px !important;
+  }
+  /* The flex row containing DATE label+input and Save btn — stack it */
+  #page-billentry .bill-entry-card > div[style*="margin-top:10px"]{
+    flex-direction:column !important;
+    align-items:stretch !important;
+    gap:10px !important;
+  }
+  #page-billentry .bill-entry-card > div[style*="margin-top:10px"] > div{
+    width:100%;
+  }
+}
+
+/* ── P7-B: Table row action buttons — bigger tap zones ─────── */
+@media(max-width:700px){
+  .tx-action-cell{
+    display:flex;
+    gap:6px;
+    align-items:center;
+  }
+  .edit-tx-btn,
+  .del-btn{
+    min-height:36px;
+    min-width:44px;
+    padding:6px 10px !important;
+    font-size:12px !important;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .action-btns .view-btn,
+  .action-btns .edit-btn{
+    min-height:36px;
+    min-width:44px;
+    padding:6px 10px !important;
+    font-size:12px !important;
+  }
+}
+
+/* ── P7-C: Receipt card — single-column form on mobile ──────── */
+@media(max-width:600px){
+  .rc-form-grid{
+    grid-template-columns:1fr !important;
+    gap:12px;
+  }
+  .rc-form-grid .full{
+    grid-column:1 !important;
+  }
+  .rc-pill{
+    padding:11px 16px;
+    font-size:14px;
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .rc-type-pills{gap:8px;}
+  .rc-save-btn{
+    min-height:52px;
+    font-size:16px;
+    margin-top:14px;
+  }
+  .receipt-card{
+    padding:16px 14px;
+    border-radius:10px;
+  }
+}
+
+/* ── P7-D: Receipt preview modal — stack share buttons on phones */
+@media(max-width:480px){
+  .rp-share-btns{
+    flex-direction:column;
+    padding:12px 16px;
+    gap:8px;
+  }
+  .rp-share-btn{
+    width:100%;
+    min-height:48px;
+    font-size:15px;
+    flex:none;
+  }
+}
+
+/* ── P7-E: Ledger share buttons — larger touch targets ──────── */
+@media(max-width:600px){
+  .export-btns .exp-btn,
+  .export-btns .edit-btn{
+    min-height:44px;
+    font-size:13px !important;
+    padding:10px 12px !important;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .exp-btn.exp-wa{
+    background:#25d366;
+    color:#fff;
+    border-color:#25d366;
+  }
+  .exp-btn.exp-wa:hover{background:#1ebe5d;border-color:#1ebe5d;}
+}
+
+/* ── P7-F: Bill log table — bigger tap targets, hide Date col── */
+@media(max-width:600px){
+  .bill-log-table .del-btn{
+    min-height:36px;
+    min-width:48px;
+    padding:6px 10px !important;
+    font-size:13px !important;
+  }
+  .bill-log-table td{padding:12px 10px;font-size:13px;}
+  .bill-log-table th{font-size:11px;padding:10px 10px;}
+  /* Hide Date column — saves width on 360px phones */
+  .bill-log-table th:nth-child(5),
+  .bill-log-table td:nth-child(5){display:none;}
+}
+
+/* ── P7-G: Bill Entry — note input full-width & balance strip ── */
+@media(max-width:600px){
+  #beNote{margin-top:8px;}
+  #beNoteInput{min-height:44px;font-size:16px !important;}
+  .be-party-bal-strip{font-size:13px;padding:10px 12px;flex-wrap:wrap;gap:6px;}
+}
+
+/* ── P7-H: Receipt register table — horizontal scroll ────────── */
+@media(max-width:600px){
+  #page-rcregister table{
+    display:block;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  #page-rcregister table td,
+  #page-rcregister table th{
+    white-space:nowrap;
+    padding:11px 10px;
+    font-size:13px;
+  }
+}
+
+/* ── END PHASE 7 ─────────────────────────────────────────────── */
 
 /* ── GLOBAL QUICK SEARCH ── */
 .global-search-wrap{position:relative;}
@@ -5279,6 +5449,88 @@ function closeInstallGuide(){
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
 }
+
+// ── AUTO-UPDATE CHECKER ──────────────────────────────────────────────────────
+// Checks if the HTML file on GitHub has changed since the user last loaded it.
+// If a new version is detected → shows a small non-intrusive banner asking to reload.
+// SAFE: only checks the file's Last-Modified header — never reads or writes any data.
+// Firebase, localStorage, and all user data are completely untouched.
+(function(){
+  // Store the ETag/Last-Modified of the page at load time
+  const STORAGE_KEY = 'kkAppVersion';
+
+  async function checkForUpdate(){
+    try {
+      // HEAD request — downloads zero bytes, just headers
+      const res = await fetch(location.href, {
+        method: 'HEAD',
+        cache: 'no-store'  // bypass cache completely for this check
+      });
+      // Use ETag if available, fall back to Last-Modified
+      const serverVersion = res.headers.get('etag') || res.headers.get('last-modified') || '';
+      if(!serverVersion) return; // headers not available (e.g. file://)
+
+      const knownVersion = sessionStorage.getItem(STORAGE_KEY);
+      if(!knownVersion){
+        // First visit this session — just store it
+        sessionStorage.setItem(STORAGE_KEY, serverVersion);
+        return;
+      }
+      if(knownVersion !== serverVersion){
+        // A new version is available — show the update banner
+        sessionStorage.setItem(STORAGE_KEY, serverVersion);
+        showUpdateBanner();
+      }
+    } catch(e){
+      // Offline or fetch failed — silently ignore
+    }
+  }
+
+  function showUpdateBanner(){
+    // Don't show if already showing
+    if(document.getElementById('kkUpdateBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'kkUpdateBanner';
+    banner.style.cssText = [
+      'position:fixed','top:0','left:0','right:0','z-index:999999',
+      'background:linear-gradient(135deg,#b8860b,#8b6914)',
+      'color:#fff','padding:10px 16px',
+      'display:flex','align-items:center','justify-content:space-between',
+      'gap:10px','flex-wrap:wrap',
+      'font-family:DM Sans,sans-serif','font-size:13px',
+      'box-shadow:0 2px 12px rgba(0,0,0,0.25)'
+    ].join(';');
+    banner.innerHTML = `
+      <span>🔄 <strong>New version available!</strong> Reload to get the latest update.</span>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button onclick="location.reload(true)"
+          style="padding:7px 16px;background:#fff;color:#8b6914;border:none;border-radius:6px;
+                 font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          Reload Now
+        </button>
+        <button onclick="document.getElementById('kkUpdateBanner').remove()"
+          style="padding:7px 12px;background:rgba(255,255,255,0.2);color:#fff;
+                 border:1px solid rgba(255,255,255,0.4);border-radius:6px;
+                 font-size:13px;cursor:pointer;font-family:inherit">
+          Later
+        </button>
+      </div>`;
+    document.body.appendChild(banner);
+  }
+
+  // Run check after page is fully loaded (non-blocking)
+  // Also re-check every 5 minutes while the tab stays open
+  window.addEventListener('load', ()=>{
+    setTimeout(checkForUpdate, 2000);          // 2s after load
+    setInterval(checkForUpdate, 5 * 60 * 1000); // then every 5 min
+  });
+
+  // Also check when user returns to the tab (e.g. after switching apps on mobile)
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible') checkForUpdate();
+  });
+})();
+// ── END AUTO-UPDATE CHECKER ─────────────────────────────────────────────────
 
 // ── PHASE 2: Enter key = Tab in Party Entry & Bill Entry forms ──
 (function(){
