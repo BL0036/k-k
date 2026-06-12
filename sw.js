@@ -1,10 +1,8 @@
-const CACHE_NAME = "kk-ledger-v2";
-
+const CACHE_NAME = "kk-ledger-v3";
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(["./", "./index.html"])));
   self.skipWaiting();
 });
-
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -13,7 +11,6 @@ self.addEventListener("activate", e => {
   );
   self.clients.claim();
 });
-
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   // Never intercept external requests (Google Apps Script, fonts, etc.)
