@@ -28,6 +28,8 @@
 
 <!-- Favicon -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%238b1a1a'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='%23f5e6c8' font-family='serif' font-weight='bold'>K</text></svg>">
+<!-- SheetJS — real .xlsx export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Nepali&family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -298,10 +300,47 @@ header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:0 1
 
 /* ── PDF PRINT ── */
 @media print{
-  body *{visibility:hidden;}
-  #printArea,#printArea *{visibility:visible;}
-  #printArea{position:fixed;inset:0;background:#fff;padding:20px;font-size:11px;}
-  .no-print{display:none!important;}
+  *{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+    color-adjust:exact!important;
+  }
+  @page{size:A4;margin:15mm;}
+  body > *{display:none!important;}
+  #printArea{
+    display:block!important;
+    position:static!important;
+    width:100%!important;
+    background:#fff!important;
+    color:#000!important;
+    font-size:11px!important;
+    padding:0!important;
+    margin:0!important;
+    box-shadow:none!important;
+    border:none!important;
+  }
+  #printArea *{
+    color:#000!important;
+    background:transparent!important;
+    box-shadow:none!important;
+    text-shadow:none!important;
+    visibility:visible!important;
+  }
+  #printArea table{
+    width:100%!important;
+    border-collapse:collapse!important;
+    font-size:11px!important;
+  }
+  #printArea th,#printArea td{
+    border:1px solid #999!important;
+    padding:5px 8px!important;
+    font-size:11px!important;
+  }
+  #printArea tr{page-break-inside:avoid!important;}
+  .no-print,
+  #header,#nav,#syncBar,#installBanner,
+  button,.back-btn,.export-btns,.filter-btn,
+  .date-filter-bar,.type-pills{display:none!important;}
 }
 #printArea{display:none;}
 
@@ -1551,6 +1590,178 @@ header .global-search-drop{top:calc(100% + 6px);}
 .bill-daily-total .dt-val{font-weight:700;font-family:'Playfair Display',serif;font-size:16px;color:var(--accent);}
 
 /* ── EXCEL IMPORT ── */
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE NATIVE APP ENHANCEMENTS  (appended — do not edit above)
+   All mobile changes scoped inside @media(max-width:700px)
+   Desktop (>700px) is completely unaffected.
+   ══════════════════════════════════════════════════════════ */
+
+/* CHANGE 5 — Safe area variables (global, harmless on desktop) */
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top:    env(safe-area-inset-top,    0px);
+}
+body {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* CHANGE 1 — Bottom nav: hidden by default, shown on mobile */
+#mobileBottomNav {
+  display: none;
+}
+
+@media (max-width: 700px) {
+
+  /* Hide hamburger + header nav — bottom nav replaces them */
+  .hdr-nav    { display: none !important; }
+  .hamburger  { display: none !important; }
+
+  /* CHANGE 6 — Compact header */
+  header {
+    min-height: 48px !important;
+    padding: 6px 12px !important;
+  }
+  .hdr-logo { font-size: 15px !important; }
+  .hdr-sub  { display: none !important; }
+  .hdr-actions .settings-btn { display: none !important; }
+  .hdr-install-btn            { display: none !important; }
+
+  /* CHANGE 1 — Bottom navigation bar */
+  #mobileBottomNav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: linear-gradient(135deg, #8b1a1a, #5a0f0f);
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+    border-top: 2px solid rgba(184, 134, 11, 0.4);
+  }
+
+  .mob-tab {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: rgba(255,255,255,0.75);
+    font-size: 10px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 6px 4px;
+    border-radius: 8px;
+    transition: background 0.15s, color 0.15s;
+    flex: 1;
+  }
+  .mob-tab-icon  { font-size: 18px; line-height: 1; }
+  .mob-tab-label { font-size: 10px; line-height: 1; font-family: 'DM Sans', sans-serif; }
+  .mob-tab.active {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+  }
+
+  /* Push page content above the bottom nav */
+  #app {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* CHANGE 3 — Modals as bottom sheets */
+  .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .modal-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    animation: slideUp 0.25s ease-out !important;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0.8; }
+    to   { transform: translateY(0);    opacity: 1;   }
+  }
+  /* Drag handle pill at top of bottom sheet */
+  .modal-box::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 8px auto 12px;
+  }
+
+  /* CHANGE 4 — Touch targets & tap feedback */
+  button, .btn, .nav-btn, .modal-save, .modal-cancel,
+  select, input[type="text"], input[type="number"], input[type="date"] {
+    min-height: 44px !important;
+  }
+  button:active, .btn:active {
+    opacity: 0.75;
+    transform: scale(0.97);
+    transition: transform 0.08s, opacity 0.08s;
+  }
+  /* 16px prevents iOS auto-zoom on focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  /* Horizontal scroll for tables */
+  .table-wrap, table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  .card, .modal-box {
+    padding: 16px !important;
+  }
+  .ledger-row, .party-row {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+    min-height: 48px !important;
+  }
+
+} /* end @media(max-width:700px) */
+
+/* CHANGE 2 — FAB Quick-Add button (hidden by default, flex on mobile) */
+#fabAdd {
+  display: none;
+  position: fixed;
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8b1a1a, #c0392b);
+  color: #fff;
+  font-size: 28px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(139, 26, 26, 0.5);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+@media (max-width: 700px) {
+  #fabAdd { display: flex; }
+}
+#fabAdd:active {
+  transform: scale(0.92);
+  box-shadow: 0 2px 8px rgba(139, 26, 26, 0.4);
+}
 </style>
 </head>
 <body>
@@ -3624,84 +3835,213 @@ function loadSheetJS(cb){
   s.onload=cb; document.head.appendChild(s);
 }
 
+// Format number with comma separators (no currency symbol, for cells)
+function fmtXL(n){
+  const v = safeNum(n);
+  return v === 0 ? 0 : Number(v.toFixed(2));
+}
+
+// Apply bold + background fill style to a range of cells in a worksheet
+function xlStyleRange(ws, r1c1, r1, c1, r2, c2, bold, bgRGB){
+  for(let R=r1; R<=r2; R++){
+    for(let C=c1; C<=c2; C++){
+      const addr = XLSX.utils.encode_cell({r:R,c:C});
+      if(!ws[addr]) ws[addr]={t:'z',v:''};
+      ws[addr].s = ws[addr].s || {};
+      if(bold) ws[addr].s.font = {bold:true};
+      if(bgRGB) ws[addr].s.fill = {fgColor:{rgb:bgRGB},patternType:'solid'};
+    }
+  }
+}
+
 function exportExcel(){
   if(!currentParty){ showToast('No party selected','red'); return; }
   loadSheetJS(()=>{
     const p = DB[currentParty];
     let txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
-    // Apply date filter (same as viewParty)
+
+    // Apply date filter — same logic as viewParty
     let openBal;
     if(dateFilterFrom){
       const preTxs = txs.filter(t=>(t.date||'') < dateFilterFrom);
-      openBal = preTxs.length ? (preTxs[preTxs.length-1].runningBalance ?? safeNum(p.opening_balance)) : safeNum(p.opening_balance);
+      openBal = preTxs.length
+        ? (preTxs[preTxs.length-1].runningBalance ?? safeNum(p.opening_balance))
+        : safeNum(p.opening_balance);
       txs = txs.filter(t=>(t.date||'') >= dateFilterFrom);
     } else {
       openBal = safeNum(p.opening_balance);
     }
     if(dateFilterTo) txs = txs.filter(t=>(t.date||'') <= dateFilterTo);
-    const totalDr = txs.reduce((s,t)=>s+safeNum(t.debit),0);
-    const totalCr = txs.reduce((s,t)=>s+safeNum(t.credit),0);
+
+    const totalDr    = txs.reduce((s,t)=>s+safeNum(t.debit),0);
+    const totalCr    = txs.reduce((s,t)=>s+safeNum(t.credit),0);
     const closingBal = openBal + totalDr - totalCr;
-    
+
+    const today      = new Date().toISOString().slice(0,10);
+    const periodStr  = (dateFilterFrom||dateFilterTo)
+      ? `Period: ${dateFilterFrom||'start'}  →  ${dateFilterTo||'end'}`
+      : 'Full Ledger (FY 2082/83)';
+
+    const coInfo = [
+      COMPANY.name,
+      COMPANY.pan  ? 'PAN: '+COMPANY.pan  : '',
+      COMPANY.addr || '',
+      COMPANY.phone? 'Ph: '+COMPANY.phone : '',
+      COMPANY.email|| '',
+    ].filter(Boolean).join('  |  ');
+
+    const partyInfo = [
+      p.name,
+      p.pan  ? 'PAN: '+p.pan  : '',
+      p.phone? 'Ph: '+p.phone : '',
+    ].filter(Boolean).join('  |  ');
+
+    // Build rows
     const ws_data = [
-      [COMPANY.name],
-      [COMPANY.pan?'PAN: '+COMPANY.pan:'', COMPANY.addr||''],
-      [],
-      ['PARTY LEDGER — '+p.name],
-      [p.pan?'PAN: '+p.pan:'', p.phone?'Ph: '+p.phone:''],
-      [],
-      ['#','Date (BS)','Particular','Bill No.','Debit (Dr.)','Credit (Cr.)','Balance','Note'],
-      [0,'—','OPENING BALANCE b/d','—',openBal,'—',openBal,''],
+      /* 0 */ [coInfo],
+      /* 1 */ ['PARTY LEDGER  —  ' + partyInfo],
+      /* 2 */ [periodStr, '', '', '', '', '', 'Exported: '+today],
+      /* 3 */ [],
+      /* 4 */ ['#','Date (BS)','Particular','Bill No.','Debit (Sales)','Credit (Receipt)','Running Balance','Note'],
+      /* 5 */ ['','','OPENING BALANCE b/d','',fmtXL(openBal),'',fmtXL(openBal),''],
     ];
     txs.forEach((t,i)=>{
-      ws_data.push([i+1, t.date||'', t.particular, t.bn||'', safeNum(t.debit)||'', safeNum(t.credit)||'', safeNum(t.runningBalance), t.note||'']);
+      ws_data.push([
+        i+1,
+        t.date||'',
+        t.particular,
+        t.bn||'',
+        safeNum(t.debit)  > 0 ? fmtXL(t.debit)  : '',
+        safeNum(t.credit) > 0 ? fmtXL(t.credit) : '',
+        fmtXL(t.runningBalance),
+        t.note||'',
+      ]);
     });
     ws_data.push([]);
-    ws_data.push(['','','','TOTAL / CLOSING BALANCE',totalDr, totalCr, closingBal,'']);
-    
+    ws_data.push(['','','TOTAL / CLOSING BALANCE','',fmtXL(totalDr),fmtXL(totalCr),fmtXL(closingBal),'']);
+
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    ws['!cols']=[{wch:4},{wch:12},{wch:22},{wch:10},{wch:14},{wch:14},{wch:14},{wch:20}];
-    XLSX.utils.book_append_sheet(wb, ws, p.name.substring(0,30));
-    const suffix = (dateFilterFrom||dateFilterTo) ? `_${dateFilterFrom||'start'}_to_${dateFilterTo||'end'}` : '_2082-83';
-    XLSX.writeFile(wb, `${p.name}_Ledger${suffix}.xlsx`);
+
+    // Column widths — nothing wraps
+    ws['!cols'] = [
+      {wch:5},   // #
+      {wch:13},  // Date
+      {wch:28},  // Particular
+      {wch:12},  // Bill No
+      {wch:16},  // Debit
+      {wch:16},  // Credit
+      {wch:18},  // Balance
+      {wch:24},  // Note
+    ];
+
+    // Merge company info across all columns (row 0 and row 1)
+    ws['!merges'] = [
+      {s:{r:0,c:0},e:{r:0,c:7}},
+      {s:{r:1,c:0},e:{r:1,c:7}},
+      {s:{r:2,c:0},e:{r:2,c:5}},
+    ];
+
+    const safeSheetName = p.name.replace(/[:\\/?*\[\]]/g,'').substring(0,31);
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+
+    const fileSuffix = (dateFilterFrom||dateFilterTo)
+      ? `_${dateFilterFrom||'start'}_to_${dateFilterTo||'end'}`
+      : `_${today}`;
+    const safePartyName = p.name.replace(/[/\\:*?"<>|]/g,'_');
+    XLSX.writeFile(wb, `${safePartyName}_Ledger${fileSuffix}.xlsx`);
     showToast('✓ Excel downloaded!','green');
   });
 }
 
 function exportAllExcel(){
   loadSheetJS(()=>{
-    const wb = XLSX.utils.book_new();
-    // Summary sheet
+    const wb   = XLSX.utils.book_new();
+    const today = new Date().toISOString().slice(0,10);
+    const keys  = Object.keys(DB).sort((a,b)=>DB[a].name.localeCompare(DB[b].name));
+
+    // ── Summary sheet ──
     const summaryData = [
-      [COMPANY.name+' — All Parties Summary'],
-      ['FY 2082/83'],
+      [COMPANY.name + '  —  All Parties Ledger Summary'],
+      ['FY 2082/83  |  Exported: ' + today],
       [],
-      ['#','Party Name','PAN','Phone','Opening Bal','Total Sales','Total Received','Balance','Last Entry'],
+      ['#','Party Name','PAN','Phone','Opening Bal','Total Sales (Dr.)','Total Received (Cr.)','Outstanding Balance','Last Entry'],
     ];
-    const keys = Object.keys(DB).sort((a,b)=>DB[a].name.localeCompare(DB[b].name));
+    let gOB=0, gDr=0, gCr=0, gBal=0;
     keys.forEach((k,i)=>{
-      const p=DB[k];
-      summaryData.push([i+1, p.name, p.pan||'', p.phone||'', p.opening_balance||0, getTotalDebit(k), getTotalCredit(k), getBalance(k), getLastDate(k)||'']);
+      const p   = DB[k];
+      const ob  = safeNum(p.opening_balance);
+      const dr  = getTotalDebit(k);
+      const cr  = getTotalCredit(k);
+      const bal = getBalance(k);
+      gOB+=ob; gDr+=dr; gCr+=cr; gBal+=bal;
+      summaryData.push([
+        i+1, p.name, p.pan||'', p.phone||'',
+        fmtXL(ob), fmtXL(dr), fmtXL(cr), fmtXL(bal),
+        getLastDate(k)||'',
+      ]);
     });
+    summaryData.push([]);
+    summaryData.push([
+      '','GRAND TOTAL ('+keys.length+' parties)','','',
+      fmtXL(gOB), fmtXL(gDr), fmtXL(gCr), fmtXL(gBal), '',
+    ]);
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-    wsSummary['!cols']=[{wch:4},{wch:30},{wch:12},{wch:14},{wch:14},{wch:14},{wch:16},{wch:14},{wch:12}];
+    wsSummary['!cols'] = [
+      {wch:5},{wch:32},{wch:14},{wch:16},
+      {wch:18},{wch:20},{wch:22},{wch:20},{wch:14},
+    ];
+    wsSummary['!merges'] = [
+      {s:{r:0,c:0},e:{r:0,c:8}},
+      {s:{r:1,c:0},e:{r:1,c:8}},
+    ];
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
-    
-    // Individual sheets (first 20 parties)
+
+    // ── Individual party sheets ──
     keys.forEach(k=>{
-      const p=DB[k];
-      const txs=p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
-      const openBal=p.opening_balance||0;
-      const data=[['#','Date','Particular','Bill No.','Debit','Credit','Balance']];
-      data.push([0,'—','OPENING BALANCE','—',openBal,'—',openBal]);
-      txs.forEach((t,i)=>data.push([i+1,t.date||'',t.particular,t.bn||'',safeNum(t.debit)||'',safeNum(t.credit)||'',safeNum(t.runningBalance)]));
-      const ws=XLSX.utils.aoa_to_sheet(data);
-      ws['!cols']=[{wch:4},{wch:12},{wch:22},{wch:10},{wch:12},{wch:12},{wch:12}];
-      XLSX.utils.book_append_sheet(wb, ws, p.name.substring(0,28));
+      const p      = DB[k];
+      const txs    = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+      const openBal= safeNum(p.opening_balance);
+      const totalDr= txs.reduce((s,t)=>s+safeNum(t.debit),0);
+      const totalCr= txs.reduce((s,t)=>s+safeNum(t.credit),0);
+      const closing= openBal+totalDr-totalCr;
+
+      const partyInfo = [p.name, p.pan?'PAN: '+p.pan:'', p.phone?'Ph: '+p.phone:''].filter(Boolean).join('  |  ');
+      const data = [
+        [COMPANY.name],
+        ['PARTY LEDGER  —  '+partyInfo],
+        ['Full Ledger (FY 2082/83)', '', '', '', '', '', 'Exported: '+today],
+        [],
+        ['#','Date (BS)','Particular','Bill No.','Debit (Sales)','Credit (Receipt)','Running Balance','Note'],
+        ['','','OPENING BALANCE b/d','',fmtXL(openBal),'',fmtXL(openBal),''],
+      ];
+      txs.forEach((t,i)=>{
+        data.push([
+          i+1, t.date||'', t.particular, t.bn||'',
+          safeNum(t.debit)>0  ? fmtXL(t.debit)  : '',
+          safeNum(t.credit)>0 ? fmtXL(t.credit) : '',
+          fmtXL(t.runningBalance),
+          t.note||'',
+        ]);
+      });
+      data.push([]);
+      data.push(['','','TOTAL / CLOSING BALANCE','',fmtXL(totalDr),fmtXL(totalCr),fmtXL(closing),'']);
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [
+        {wch:5},{wch:13},{wch:28},{wch:12},
+        {wch:16},{wch:16},{wch:18},{wch:24},
+      ];
+      ws['!merges'] = [
+        {s:{r:0,c:0},e:{r:0,c:7}},
+        {s:{r:1,c:0},e:{r:1,c:7}},
+        {s:{r:2,c:0},e:{r:2,c:5}},
+      ];
+      const safeSheetName = p.name.replace(/[:\\/?*\[\]]/g,'').substring(0,31);
+      XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
     });
-    
-    XLSX.writeFile(wb, `KK_Ledger_All_Parties_2082-83.xlsx`);
+
+    XLSX.writeFile(wb, `KK_Ledger_All_Parties_${today}.xlsx`);
     showToast('✓ All parties exported to Excel!','green');
   });
 }
@@ -3717,20 +4057,20 @@ function exportPDF(){
   const totalDr=txs.reduce((s,t)=>s+(t.debit||0),0);
   const totalCr=txs.reduce((s,t)=>s+(t.credit||0),0);
   const closingBal=openBal+totalDr-totalCr;
-  
+
   const drTypes={}, crTypes={};
   txs.filter(t=>t.debit>0).forEach(t=>{ drTypes[t.particular]=(drTypes[t.particular]||0)+t.debit; });
   txs.filter(t=>t.credit>0).forEach(t=>{ crTypes[t.particular]=(crTypes[t.particular]||0)+t.credit; });
-  
+
   let drRows=`<tr style="background:#f0ebe0"><td><b>Opening Balance b/d</b></td><td style="text-align:right"><b>${fmt(openBal)}</b></td></tr>`;
   Object.entries(drTypes).forEach(([k,v])=>{ drRows+=`<tr><td>${k}</td><td style="text-align:right">${fmt(v)}</td></tr>`; });
   drRows+=`<tr style="background:#f0ebe0;font-weight:700"><td>TOTAL</td><td style="text-align:right">${fmt(openBal+totalDr)}</td></tr>`;
-  
+
   let crRows='';
   Object.entries(crTypes).forEach(([k,v])=>{ crRows+=`<tr><td>${k}</td><td style="text-align:right">${fmt(v)}</td></tr>`; });
   crRows+=`<tr style="background:#f0ebe0"><td><b>Closing Balance c/d</b></td><td style="text-align:right"><b>${fmt(closingBal)}</b></td></tr>`;
   crRows+=`<tr style="background:#f0ebe0;font-weight:700"><td>TOTAL</td><td style="text-align:right">${fmt(totalCr+closingBal)}</td></tr>`;
-  
+
   let txRows=`<tr style="background:#f0e8d8"><td colspan="2"><b>OPENING BALANCE b/d</b></td><td></td><td></td><td></td><td style="text-align:right"><b>${fmt(openBal)}</b></td></tr>`;
   txs.forEach((t,i)=>{
     txRows+=`<tr style="background:${i%2?'#fff':'#faf7f0'}">
@@ -3741,24 +4081,35 @@ function exportPDF(){
     </tr>`;
   });
   txRows+=`<tr style="background:#f0e8d8;font-weight:700"><td colspan="3">TOTAL / CLOSING BALANCE</td><td style="text-align:right;color:#8b1a1a">${fmt(totalDr)}</td><td style="text-align:right;color:#1a6b3a">${fmt(totalCr)}</td><td style="text-align:right">${fmt(closingBal)}</td></tr>`;
-  
+
   const coInfo=[COMPANY.pan?'PAN: '+COMPANY.pan:'',COMPANY.addr,COMPANY.phone?'Ph: '+COMPANY.phone:'',COMPANY.email,COMPANY.extra].filter(Boolean).join(' | ');
   const filterInfo=dateFilterFrom||dateFilterTo?`<br><em>Period: ${dateFilterFrom||'start'} to ${dateFilterTo||'end'}</em>`:'';
-  
-  const html=`<html><head><title>${p.name} Ledger</title>
+
+  const html=`<!DOCTYPE html><html><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${p.name} Ledger</title>
   <style>
-  body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:20px}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
+  @page{size:A4;margin:15mm;}
+  body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:20px;color:#000;background:#fff;}
   .header{text-align:center;border-bottom:2px solid #8b1a1a;padding-bottom:12px;margin-bottom:16px}
   .co-name{font-size:18px;font-weight:bold;color:#8b1a1a;letter-spacing:1px}
   .co-info{font-size:10px;color:#555;margin-top:3px}
   .party-name{font-size:15px;font-weight:bold;color:#333;margin-top:8px}
   table{width:100%;border-collapse:collapse;margin-bottom:16px}
   th{background:#8b1a1a;color:#fff;padding:7px 10px;font-size:10px}
-  td{padding:5px 10px;border-bottom:1px solid #e8ddd0}
+  td{padding:5px 10px;border-bottom:1px solid #e8ddd0;font-size:11px;}
+  tr{page-break-inside:avoid;}
   .conf-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
   .conf-box{border:1px solid #ccc;border-radius:6px;overflow:hidden}
   .conf-title{background:#8b1a1a;color:#fff;padding:7px 12px;font-size:10px;font-weight:bold}
-  @media print{.no-print{display:none}}
+  @media print{
+    body{padding:0;}
+    .conf-grid{display:table;width:100%;}
+    .conf-box{display:inline-block;width:48%;vertical-align:top;margin-right:2%;}
+    tr{page-break-inside:avoid!important;}
+  }
   </style></head><body>
   <div class="header">
     <div class="co-name">${COMPANY.name}</div>
@@ -3775,11 +4126,38 @@ function exportPDF(){
     <tbody>${txRows}</tbody>
   </table>
   <div style="text-align:right;font-size:10px;color:#888;margin-top:8px">K & K Trading Concern — Ledger System</div>
-  <script>window.print();window.close();<\/script>
   </body></html>`;
-  
-  const win=window.open('','_blank','width=900,height=700');
-  win.document.write(html); win.document.close();
+
+  // Create a Blob URL — Android Chrome handles this much better than document.write
+  var blob = new Blob([html], {type: 'text/html'});
+  var blobUrl = URL.createObjectURL(blob);
+  var win = window.open(blobUrl, '_blank');
+  if(!win){
+    // Popup blocked — fallback: create hidden iframe for print
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+    document.body.appendChild(iframe);
+    iframe.onload = function(){
+      setTimeout(function(){
+        try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){}
+        setTimeout(function(){ document.body.removeChild(iframe); URL.revokeObjectURL(blobUrl); }, 2000);
+      }, 400);
+    };
+    iframe.src = blobUrl;
+    showToast('⚠ Popup blocked — trying iframe print...', '');
+    return;
+  }
+  // Blob URL window opened — wait for full load before printing
+  win.onload = function(){
+    setTimeout(function(){
+      try{ win.focus(); win.print(); }catch(e){}
+      setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 3000);
+    }, 350);
+  };
+  // Extra safety fallback for Samsung
+  setTimeout(function(){
+    try{ if(win && !win.closed){ win.focus(); win.print(); } }catch(e){}
+  }, 1200);
 }
 
 // ── EXPORT SUMMARY PDF ──
@@ -3840,7 +4218,7 @@ function exportSummaryPDF(){
     .stat-box .lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
     .stat-box .val{font-size:15px;font-weight:700;margin-top:4px}
     .footer{text-align:right;font-size:9px;color:#aaa;margin-top:12px;border-top:1px solid #eee;padding-top:8px}
-    @media print{body{padding:10px}@page{margin:10mm;size:A4 landscape}}
+    @media print{body{padding:0;}tr{page-break-inside:avoid!important;}table{width:100%!important;table-layout:fixed!important;}th,td{font-size:9px!important;padding:4px 6px!important;word-break:break-word;}}@page{size:A4 landscape;margin:10mm;}
   </style></head><body>
   <div class="header">
     <div class="co-name">${COMPANY.name||'K & K TRADING CONCERN'}</div>
@@ -3878,12 +4256,38 @@ function exportSummaryPDF(){
     </tbody>
   </table>
   <div class="footer">${COMPANY.name||'K & K Trading Concern'} — Ledger Summary | Generated ${new Date().toLocaleString('en-IN')}</div>
-  <script>window.print();window.close();<\/script>
   </body></html>`;
 
-  const win=window.open('','_blank','width=1100,height=750');
-  if(!win){ showToast('❌ Popup blocked! Allow popups for this page.','red'); return; }
-  win.document.write(html); win.document.close();
+  // Create a Blob URL — Android Chrome handles this much better than document.write
+  var blob = new Blob([html], {type: 'text/html'});
+  var blobUrl = URL.createObjectURL(blob);
+  var win = window.open(blobUrl, '_blank');
+  if(!win){
+    // Popup blocked — fallback: create hidden iframe for print
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+    document.body.appendChild(iframe);
+    iframe.onload = function(){
+      setTimeout(function(){
+        try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){}
+        setTimeout(function(){ document.body.removeChild(iframe); URL.revokeObjectURL(blobUrl); }, 2000);
+      }, 400);
+    };
+    iframe.src = blobUrl;
+    showToast('⚠ Popup blocked — trying iframe print...', '');
+    return;
+  }
+  // Blob URL window opened — wait for full load before printing
+  win.onload = function(){
+    setTimeout(function(){
+      try{ win.focus(); win.print(); }catch(e){}
+      setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 3000);
+    }, 350);
+  };
+  // Extra safety fallback for Samsung
+  setTimeout(function(){
+    try{ if(win && !win.closed){ win.focus(); win.print(); } }catch(e){}
+  }, 1200);
 }
 function openEditTx(key, idx){
   const t = DB[key].transactions[idx];
@@ -4328,7 +4732,7 @@ function showPage(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   const btns=['dashboard','billentry','billregister','ledger','reports','receipt','rcregister'];
   const idx=btns.indexOf(name);
-  if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if(idx>=0){ const nb=document.querySelectorAll('.nav-btn')[idx]; if(nb) nb.classList.add('active'); }
   if(name==='billregister'){
     renderBillRegister();
     window.scrollTo(0,0);
@@ -4486,10 +4890,19 @@ function renderStats(){
   const keys = Object.keys(DB);
   let totalBal=0,totalDebit=0,totalCredit=0,overdueCount=0;
   let inBal=0,outBal=0;
+  let todaySales=0,todayReceipt=0;
+  const todayBS = BS_TODAY_APPROX; // "YYYY-MM-DD" in Bikram Sambat — same format as t.date
   keys.forEach(k=>{
     const b=getBalance(k); totalBal+=b; totalDebit+=getTotalDebit(k); totalCredit+=getTotalCredit(k);
     if(getAgingDays(k)>60) overdueCount++;
     if((DB[k].valley||'outside')==='inside') inBal+=b; else outBal+=b;
+    DB[k].transactions.forEach(t=>{
+      if(t.particular==='TOTAL AMOUNT') return;
+      if((t.date||'')=== todayBS){
+        if(safeNum(t.debit)>0)  todaySales   += safeNum(t.debit);
+        if(safeNum(t.credit)>0) todayReceipt += safeNum(t.credit);
+      }
+    });
   });
   document.getElementById('statRow').innerHTML=`
     <div class="stat-card" data-icon="🏢"><div class="stat-label">Total Parties</div><div class="stat-val blue">${keys.length}</div></div>
@@ -4499,6 +4912,8 @@ function renderStats(){
     <div class="stat-card" data-icon="🏙️"><div class="stat-label">Inside Valley</div><div class="stat-val blue">${fmt(inBal)}</div></div>
     <div class="stat-card" data-icon="🏔️"><div class="stat-label">Outside Valley</div><div class="stat-val red">${fmt(outBal)}</div></div>
     <div class="stat-card" data-icon="⚠️"><div class="stat-label">Overdue 60+ Days</div><div class="stat-val red">${overdueCount}</div></div>
+    <div class="stat-card" data-icon="🛒"><div class="stat-label">आजको बिक्री <span style="font-size:10px;color:var(--muted);font-weight:400">(Today's Sales)</span></div><div class="stat-val gold">${todaySales>0?fmt(todaySales):'—'}</div></div>
+    <div class="stat-card" data-icon="💵"><div class="stat-label">आजको रसिद <span style="font-size:10px;color:var(--muted);font-weight:400">(Today's Receipt)</span></div><div class="stat-val green">${todayReceipt>0?fmt(todayReceipt):'—'}</div></div>
   `;
 }
 
@@ -4916,7 +5331,7 @@ function saveReceipt(){
   document.getElementById('rcChequeDetail').value='';
   document.getElementById('rcBalAfter').value='';
   document.getElementById('rcPartyStrip').classList.remove('show');
-  // Auto-suggest next receipt number (smart RCP:XX format)
+  // Auto-suggest next receipt number (plain integer)
   document.getElementById('rcNo').value = getNextReceiptNumber();
 }
 
@@ -5205,14 +5620,35 @@ function rcPrintPDF(){
     '.rp-sig-line{border-top:1px solid #1a1208;width:120px;margin-top:28px;margin-bottom:4px;}' +
     '@media print{body{margin:0;}@page{margin:10mm;}}' +
     '</style>';
-  // Open dedicated popup — main app stays visible and untouched
-  var pw = window.open('', '_blank', 'width=620,height=850');
-  if(!pw){ showToast('\u274C Popup blocked! Please allow popups for this page.', 'red'); return; }
-  pw.document.open();
-  pw.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt - ' + (_rcLastReceiptData.rcNo||'') + '</title>' + printStyles + '</head><body>' + receiptContent + '</body></html>');
-  pw.document.close();
-  pw.onload = function(){ pw.focus(); pw.print(); };
-  setTimeout(function(){ try{ pw.focus(); pw.print(); }catch(e){} }, 900);
+  // Build full HTML document string
+  var fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt - ' + (_rcLastReceiptData.rcNo||'') + '</title>' + printStyles + '</head><body>' + receiptContent + '</body></html>';
+  // Create a Blob URL — Android Chrome handles this much better than document.write
+  var blob = new Blob([fullHtml], {type: 'text/html'});
+  var blobUrl = URL.createObjectURL(blob);
+  var pw = window.open(blobUrl, '_blank');
+  if(!pw){
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+    document.body.appendChild(iframe);
+    iframe.onload = function(){
+      setTimeout(function(){
+        try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){}
+        setTimeout(function(){ document.body.removeChild(iframe); URL.revokeObjectURL(blobUrl); }, 2000);
+      }, 400);
+    };
+    iframe.src = blobUrl;
+    showToast('⚠ Popup blocked — trying iframe print...', '');
+    return;
+  }
+  pw.onload = function(){
+    setTimeout(function(){
+      try{ pw.focus(); pw.print(); }catch(e){}
+      setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 3000);
+    }, 350);
+  };
+  setTimeout(function(){
+    try{ if(pw && !pw.closed){ pw.focus(); pw.print(); } }catch(e){}
+  }, 1200);
 }
 
 // ── PHASE 4: BILL SERIAL GAP CHECKER ──
@@ -5874,21 +6310,7 @@ document.addEventListener('focusin', function(e){
 });
 
 // ── PHASE 7C: Bill Entry date — persist last date across entries
-(function(){
-  const STORAGE_KEY = 'kkLastBeDate';
-  // Restore saved date when switching to billentry page
-  const _origShowPage = showPage;
-  showPage = function(name){
-    _origShowPage(name);
-    if(name === 'billentry'){
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const dateEl = document.getElementById('beDate');
-      if(saved && dateEl && !dateEl.value) dateEl.value = saved;
-    }
-  };
-  // Note: beDate is now a plain text input — no bsSelectDay patch needed.
-  // Persistence is handled by the change listener attached in Phase 2.
-})();
+// (date restoration is handled by the unified showPage wrapper below)
 
 
 // ── GLOBAL QUICK SEARCH ──────────────────────────────────────
@@ -6047,14 +6469,24 @@ function getNextReceiptNumber(){
   let max = 0;
   Object.keys(DB).forEach(k=>{
     DB[k].transactions.forEach(t=>{
-      if(t.isDebit === false && t.bn){   // credit = receipt
-        const n = extractNumber(t.bn);
-        if(!isNaN(n) && n > max) max = n;
+      // Include any transaction with a bill/receipt number that is purely numeric
+      // (covers credit entries, zero-amount notes, and any receipt-type entry)
+      if(t.bn){
+        const trimmed = String(t.bn).trim();
+        // Only consider plain numeric receipt numbers (not bill numbers like "INV-001")
+        if(/^\d+$/.test(trimmed)){
+          const n = parseInt(trimmed, 10);
+          if(!isNaN(n) && n > max) max = n;
+        } else {
+          // Also handle extractNumber for mixed formats
+          const n = extractNumber(t.bn);
+          if(!isNaN(n) && n > max && t.credit > 0) max = n;
+        }
       }
     });
   });
-  const next = max + 1;  // 1 when no data
-  return 'RCP:' + String(next).padStart(2, '0');
+  const next = max + 1;
+  return String(next);
 }
 
 function updateNextBnHint(){
@@ -6072,8 +6504,20 @@ function updateNextBnHint(){
 
 function updateNextRcHint(){
   const el = document.getElementById('rcNo');
-  if(!el || el.value.trim()) return;  // never overwrite user input
+  if(!el) return;
+  // Always refresh — stale value from post-save reset must not block auto-fill
   el.value = getNextReceiptNumber();
+  let hint = document.getElementById('rcNoHint');
+  if(!hint){
+    hint = document.createElement('div');
+    hint.id = 'rcNoHint';
+    hint.style.cssText = 'font-size:11px;color:var(--muted);margin-top:3px;padding-left:2px';
+    el.parentNode.insertBefore(hint, el.nextSibling);
+  }
+  const last = parseInt(el.value) - 1;
+  hint.textContent = last > 0
+    ? '💡 Last receipt: ' + last + '  —  Next: ' + el.value
+    : '💡 First receipt — starting from: ' + el.value;
 }
 
 // Clear strip when party search cleared
@@ -6102,19 +6546,7 @@ document.addEventListener('DOMContentLoaded',function(){
 })();
 
 // Show next BN hint when bill entry page opens
-(function(){
-  const _origShow = showPage;
-  showPage = function(name){
-    _origShow(name);
-    if(name==='billentry'){
-      updateNextBnHint();
-      if(!document.getElementById('beParty').value){
-        const strip=document.getElementById('bePartyBalStrip');
-        if(strip) strip.classList.remove('show');
-      }
-    }
-  };
-})();
+// (handled by the unified showPage wrapper below)
 
 // ── EXCEL IMPORT ──────────────────────────────────────────────
 function importFromExcel(input){
@@ -6275,6 +6707,88 @@ function importFromExcel(input){
     <button class="modal-save" style="margin-top:14px" onclick="closeInstallGuide()">Got it</button>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════
+     MOBILE BOTTOM NAVIGATION BAR
+     6 tabs: Home · Bill · Ledger · Receipt · Rc Reg · Bills
+     Visible only on ≤700px via CSS above.
+     ══════════════════════════════════════════════ -->
+<div id="mobileBottomNav">
+  <button class="mob-tab active" data-page="dashboard"
+    onclick="showPage('dashboard');closeHamburger()">
+    <span class="mob-tab-icon">🏠</span>
+    <span class="mob-tab-label">Home</span>
+  </button>
+  <button class="mob-tab" data-page="billentry"
+    onclick="showPage('billentry');closeHamburger()">
+    <span class="mob-tab-icon">🧾</span>
+    <span class="mob-tab-label">Bill</span>
+  </button>
+  <button class="mob-tab" data-page="ledger"
+    onclick="showPage('ledger');closeHamburger()">
+    <span class="mob-tab-icon">📋</span>
+    <span class="mob-tab-label">Ledger</span>
+  </button>
+  <button class="mob-tab" data-page="receipt"
+    onclick="showPage('receipt');closeHamburger()">
+    <span class="mob-tab-icon">💵</span>
+    <span class="mob-tab-label">Receipt</span>
+  </button>
+  <button class="mob-tab" data-page="rcregister"
+    onclick="showPage('rcregister');closeHamburger()">
+    <span class="mob-tab-icon">🗂️</span>
+    <span class="mob-tab-label">Rc Reg</span>
+  </button>
+  <button class="mob-tab" data-page="billregister"
+    onclick="showPage('billregister');closeHamburger()">
+    <span class="mob-tab-icon">📊</span>
+    <span class="mob-tab-label">Bills</span>
+  </button>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     FAB QUICK-RECEIPT BUTTON
+     Navigates to Receipt Entry (primary mobile quick-action).
+     Visible only on ≤700px via CSS above.
+     ══════════════════════════════════════════════ -->
+<button id="fabAdd" title="Quick Receipt" onclick="showPage('receipt');closeHamburger()">＋</button>
+
+<!-- ══════════════════════════════════════════════
+     UNIFIED showPage() EXTENSION
+     Single wrapper consolidating all post-navigation hooks:
+     1. Mobile bottom nav active-tab highlight sync
+     2. Bill Entry: restore last-used date + BN hint + balance strip
+     3. Receipt Entry: date restore handled by main showPage()
+     ══════════════════════════════════════════════ -->
+<script>
+(function () {
+  var BEDATE_KEY = 'kkLastBeDate';
+  var _orig = window.showPage;
+  window.showPage = function (name) {
+    _orig.apply(this, arguments);
+
+    // 1 — Mobile bottom nav highlight
+    document.querySelectorAll('.mob-tab').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.page === name);
+    });
+
+    // 2 — Bill Entry extras
+    if (name === 'billentry') {
+      // Restore persisted date
+      var saved = localStorage.getItem(BEDATE_KEY);
+      var dateEl = document.getElementById('beDate');
+      if (saved && dateEl && !dateEl.value) dateEl.value = saved;
+      // Next bill number hint
+      if (typeof updateNextBnHint === 'function') updateNextBnHint();
+      // Hide balance strip if no party selected
+      if (!document.getElementById('beParty').value) {
+        var strip = document.getElementById('bePartyBalStrip');
+        if (strip) strip.classList.remove('show');
+      }
+    }
+  };
+})();
+</script>
 
 </body>
 </html>
