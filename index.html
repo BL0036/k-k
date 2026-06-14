@@ -2079,12 +2079,7 @@ body {
           <div class="type-pills">
             <div class="type-pill selected" data-type="TO GOODS" data-side="debit" onclick="selectType(this)">📦 To Goods (PAN)</div>
             <div class="type-pill" data-type="VAT BILL" data-side="debit" onclick="selectType(this)">🧾 To Goods (VAT)</div>
-            <div class="type-pill credit" data-type="BY CASH" data-side="credit" onclick="selectType(this)">💵 By Cash</div>
-            <div class="type-pill credit" data-type="BY CHEQUE" data-side="credit" onclick="selectType(this)">🏦 By Cheque</div>
-            <div class="type-pill credit" data-type="BY GOODS RETURN" data-side="credit" onclick="selectType(this)">↩️ By Goods Return</div>
-            <div class="type-pill credit" data-type="BY TRANSPORT" data-side="credit" onclick="selectType(this)">🚛 By Transport</div>
             <div class="type-pill" data-type="OTHER" data-side="debit" onclick="selectType(this)">📝 Other (Dr)</div>
-            <div class="type-pill credit" data-type="OTHER_CR" data-side="credit" onclick="selectType(this)">📝 Other (Cr)</div>
           </div>
         </div>
         <div class="form-group" id="otherLabelGroup" style="display:none">
@@ -2215,18 +2210,9 @@ body {
           <div class="party-ac-drop" id="bePartyAcDrop"></div>
         </div>
         <select class="bill-input" id="beType" onchange="beTypeChanged()">
-          <optgroup label="── Sales (Dr.) ──">
-            <option value="TO GOODS|debit">📦 To Goods (PAN)</option>
-            <option value="VAT BILL|debit">🧾 To Goods (VAT)</option>
-            <option value="OTHER|debit">📝 Other (Dr)</option>
-          </optgroup>
-          <optgroup label="── Receipts (Cr.) ──">
-            <option value="BY CASH|credit">💵 By Cash</option>
-            <option value="BY CHEQUE|credit">🏦 By Cheque</option>
-            <option value="BY GOODS RETURN|credit">↩️ Goods Return</option>
-            <option value="BY TRANSPORT|credit">🚛 Transport</option>
-            <option value="OTHER_CR|credit">📝 Other (Cr)</option>
-          </optgroup>
+          <option value="TO GOODS|debit">📦 To Goods (PAN)</option>
+          <option value="VAT BILL|debit">🧾 To Goods (VAT)</option>
+          <option value="OTHER|debit">📝 Other (Dr)</option>
         </select>
         <input type="number" class="bill-input" id="beAmount" placeholder="0.00" min="0" step="0.01">
       </div>
@@ -2334,7 +2320,7 @@ body {
         <!-- Date -->
         <div class="form-group">
           <label>Date (BS) *</label>
-          <input type="text" id="rcDate" placeholder="2082-12-16" maxlength="10" autocomplete="off" style="background:var(--row-even)">
+          <input type="text" id="rcDate" placeholder="2082-12-16" maxlength="10" autocomplete="off" style="background:var(--row-even)" onchange="localStorage.setItem('kkLastRcDate', this.value)">
         </div>
         <!-- Payment Type -->
         <div class="form-group full">
@@ -5115,6 +5101,11 @@ function selectBeParty(key){
 
 function beTypeChanged(){
   const val = document.getElementById('beType').value;
+  // Safety guard — bill entry only handles debit/sales
+  if(!val || val.includes('credit')){
+    document.getElementById('beType').value = 'TO GOODS|debit';
+    return;
+  }
   const isOther = val.startsWith('OTHER');
   document.getElementById('beNote').style.display = isOther ? 'block' : 'none';
 }
@@ -5290,11 +5281,19 @@ function saveReceipt(){
   const fullNote = chequeDetail ? (note ? note+' | '+chequeDetail : chequeDetail) : note;
 
   // Check duplicate receipt no GLOBALLY across all parties
+  const RC_TYPES = ['BY CASH','BY CHEQUE','BY TRANSPORT',
+                    'BY GOODS RETURN','OTHER_CR'];
   const globalDupes = [];
   Object.keys(DB).forEach(k=>{
     DB[k].transactions.forEach(t=>{
-      if(t.isDebit === false && t.bn && t.bn.trim() === rcNo.trim()){
-        globalDupes.push({partyName: DB[k].name, date: t.date, amount: t.credit||t.amount||0});
+      const isRcEntry = t.isDebit === false ||
+                        RC_TYPES.includes(t.particular);
+      if(isRcEntry && t.bn && t.bn.trim() === rcNo.trim()){
+        globalDupes.push({
+          partyName: DB[k].name,
+          date: t.date,
+          amount: t.credit||t.amount||0
+        });
       }
     });
   });
@@ -5321,6 +5320,9 @@ function saveReceipt(){
   // Show preview modal
   renderReceiptPreview(_rcLastReceiptData);
   document.getElementById('receiptModal').style.display='flex';
+
+  // Persist last-used receipt date
+  localStorage.setItem('kkLastRcDate', date);
 
   // Reset form
   document.getElementById('rcPartySearch').value='';
@@ -5349,10 +5351,14 @@ function renderRcRegister(){
   Object.keys(DB).forEach(k=>{
     const partyName = DB[k].name;
     DB[k].transactions.forEach(t=>{
-      if(t.isDebit !== false) return;          // only receipts
+      const RC_TYPES=['BY CASH','BY CHEQUE','BY TRANSPORT',
+                      'BY GOODS RETURN','OTHER_CR'];
+      const isReceipt = t.isDebit === false ||
+                        RC_TYPES.includes(t.particular);
+      if(!isReceipt) return;
       if(!t.bn) return;                        // must have receipt no
       if(typeFilter && t.particular !== typeFilter) return;
-      const amt = t.credit || t.amount || 0;
+      const amt = safeNum(t.credit) || safeNum(t.amount) || 0;
       const row = {
         bn: t.bn,
         date: t.date||'',
@@ -5421,10 +5427,15 @@ function renderBillRegister(){
   Object.keys(DB).forEach(k=>{
     const partyName = DB[k].name;
     DB[k].transactions.forEach(t=>{
-      if(t.isDebit === false) return;           // skip receipts
+      const RC_TYPES=['BY CASH','BY CHEQUE','BY TRANSPORT',
+                      'BY GOODS RETURN','OTHER_CR'];
+      const isBill = t.isDebit === true ||
+                     (t.isDebit !== false &&
+                      !RC_TYPES.includes(t.particular));
+      if(!isBill) return;
       if(!t.bn) return;                         // must have bill no
       if(typeFilter && t.particular !== typeFilter) return;
-      const amt = t.debit || t.amount || 0;
+      const amt = safeNum(t.debit) || safeNum(t.amount) || 0;
       const row = {
         bn: t.bn,
         date: t.date||'',
@@ -5538,6 +5549,12 @@ function renderReceiptPreview(d){
 function closeReceiptModal(){
   document.getElementById('receiptModal').style.display='none';
   _rcLastReceiptData = null;
+  setTimeout(function(){
+    var ps = document.getElementById('rcPartySearch');
+    if(ps){ ps.focus(); ps.value=''; }
+    var rp = document.getElementById('rcParty');
+    if(rp) rp.value = '';
+  }, 100);
 }
 
 // ── WhatsApp Share ──
@@ -6001,7 +6018,7 @@ if ('serviceWorker' in navigator) {
   // CORRECT ORDER per spec: Party → Date → Bill No → Type → Amount → Note → Save
   const PARTY_ENTRY_FIELDS  = ['ePartySearch', 'eDate', 'eBN', '__PILLS__', 'eOtherLabel', 'eAmount', 'eNote'];
   // Bill Entry order per spec: Bill No → Party → Type → Amount → Date → Note → Save
-  const BILL_ENTRY_FIELDS   = ['beBillNo', 'bePartySearch', 'beType', 'beAmount', 'beDate', 'beNoteInput'];
+  const BILL_ENTRY_FIELDS   = ['beBillNo', 'bePartySearch', 'beAmount', 'beDate', 'beNoteInput'];
 
   // ── Visibility helper — walks DOM to detect display:none ancestors ──
   function isVisible(el){
@@ -6132,7 +6149,15 @@ if ('serviceWorker' in navigator) {
         const party = document.getElementById('beParty').value;
         if(party){
           e.preventDefault();
-          document.getElementById('beType').focus();
+          // Silently confirm default type To Goods PAN
+          // User can change with mouse click on pills anytime before saving
+          const beTypeEl = document.getElementById('beType');
+          if(beTypeEl && !beTypeEl.value){
+            beTypeEl.value = 'TO GOODS|debit';
+          }
+          // Skip type field — jump straight to Amount
+          const amtEl = document.getElementById('beAmount');
+          if(amtEl){ amtEl.focus(); amtEl.select && amtEl.select(); }
         }
         return;
       }
@@ -6453,13 +6478,20 @@ function extractNumber(str){
 }
 
 function getNextBillNumber(){
+  const BILL_TYPES = ['TO GOODS','VAT BILL','CASH MEMO','OTHER'];
+  const RC_TYPES   = ['BY CASH','BY CHEQUE','BY TRANSPORT',
+                      'BY GOODS RETURN','OTHER_CR'];
   let max = 0;
   Object.keys(DB).forEach(k=>{
     DB[k].transactions.forEach(t=>{
-      if(t.isDebit !== false && t.bn){   // debit = bill
-        const n = extractNumber(t.bn);
-        if(!isNaN(n) && n > max) max = n;
-      }
+      if(!t.bn) return;
+      // Must be a bill type — check particular first, then isDebit
+      const isBill = BILL_TYPES.includes(t.particular) ||
+                     (t.isDebit === true &&
+                      !RC_TYPES.includes(t.particular));
+      if(!isBill) return;
+      const n = extractNumber(t.bn);
+      if(!isNaN(n) && n > max) max = n;
     });
   });
   return max + 1;  // returns 1 when no data
@@ -6467,39 +6499,46 @@ function getNextBillNumber(){
 
 function getNextReceiptNumber(){
   let max = 0;
+  let detectedPrefix = 'RCP:';
   Object.keys(DB).forEach(k=>{
     DB[k].transactions.forEach(t=>{
-      // Include any transaction with a bill/receipt number that is purely numeric
-      // (covers credit entries, zero-amount notes, and any receipt-type entry)
-      if(t.bn){
-        const trimmed = String(t.bn).trim();
-        // Only consider plain numeric receipt numbers (not bill numbers like "INV-001")
-        if(/^\d+$/.test(trimmed)){
-          const n = parseInt(trimmed, 10);
-          if(!isNaN(n) && n > max) max = n;
-        } else {
-          // Also handle extractNumber for mixed formats
-          const n = extractNumber(t.bn);
-          if(!isNaN(n) && n > max && t.credit > 0) max = n;
-        }
+      if(t.isDebit === true) return;
+      if(!t.bn) return;
+      const trimmed = String(t.bn).trim();
+      const n = extractNumber(trimmed);
+      if(isNaN(n) || n <= 0) return;
+      if(n > max){
+        max = n;
+        // Extract prefix: everything before the trailing digits
+        // e.g. "RCP:85" → "RCP:", "RC-85" → "RC-", "85" → ""
+        const prefixMatch = trimmed.match(/^(.*?)(\d+)$/);
+        detectedPrefix = prefixMatch ? prefixMatch[1] : 'RCP:';
       }
     });
   });
   const next = max + 1;
-  return String(next);
+  // If no receipts exist yet → start with RCP:1
+  return detectedPrefix + next;
 }
 
 function updateNextBnHint(){
   const hint = document.getElementById('beNextBnHint');
-  if(!hint) return;
+  const billNoInput = document.getElementById('beBillNo');
   const next = getNextBillNumber();
   const last = next - 1;
-  if(last > 0){
-    hint.textContent = '💡 Last bill: ' + last + '  —  Next expected: ' + next;
-  } else {
-    hint.textContent = '💡 No bills yet — starting from: ' + next;
+
+  // Auto-fill the bill number input if currently empty
+  if(billNoInput && !billNoInput.value){
+    billNoInput.value = String(next);
   }
-  hint.style.display = 'block';
+
+  // Update hint text below the field
+  if(hint){
+    hint.textContent = last > 0
+      ? '💡 Last bill: ' + last + '  —  Next: ' + next
+      : '💡 No bills yet — starting from: ' + next;
+    hint.style.display = 'block';
+  }
 }
 
 function updateNextRcHint(){
@@ -6514,10 +6553,15 @@ function updateNextRcHint(){
     hint.style.cssText = 'font-size:11px;color:var(--muted);margin-top:3px;padding-left:2px';
     el.parentNode.insertBefore(hint, el.nextSibling);
   }
-  const last = parseInt(el.value) - 1;
-  hint.textContent = last > 0
-    ? '💡 Last receipt: ' + last + '  —  Next: ' + el.value
-    : '💡 First receipt — starting from: ' + el.value;
+  // Extract numeric part for the "last" display
+  const nextVal = el.value;
+  const nextNum = extractNumber(nextVal);
+  const lastNum = nextNum - 1;
+  const prefix = nextVal.replace(/\d+$/, '');
+  const lastVal = lastNum > 0 ? prefix + lastNum : null;
+  hint.textContent = lastVal
+    ? '💡 Last receipt: ' + lastVal + '  —  Next: ' + nextVal
+    : '💡 First receipt — starting from: ' + nextVal;
 }
 
 // Clear strip when party search cleared
@@ -6784,6 +6828,15 @@ function importFromExcel(input){
       if (!document.getElementById('beParty').value) {
         var strip = document.getElementById('bePartyBalStrip');
         if (strip) strip.classList.remove('show');
+      }
+    }
+
+    // 3 — Receipt Entry extras
+    if (name === 'receipt') {
+      var savedRc = localStorage.getItem('kkLastRcDate');
+      var rcDateEl = document.getElementById('rcDate');
+      if (savedRc && rcDateEl && !rcDateEl.value) {
+        rcDateEl.value = savedRc;
       }
     }
   };
