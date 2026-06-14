@@ -1,4 +1,4 @@
-const CACHE_NAME = "kk-ledger-v3";
+const CACHE_NAME = "kk-ledger-v4";
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(["./", "./index.html"])));
   self.skipWaiting();
