@@ -30,8 +30,8 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%238b1a1a'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='%23f5e6c8' font-family='serif' font-weight='bold'>K</text></svg>">
 <!-- SheetJS — real .xlsx export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- html2pdf.js — PDF blob generation for Share PDF feature -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- jsPDF — native PDF generation for Share PDF feature -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Nepali&family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -4166,130 +4166,140 @@ function exportPDF(){
 // ── SHARE LEDGER PDF ──
 async function shareLedgerPDF(){
   if(!currentParty){ showToast('No party selected','red'); return; }
-
   if(!navigator.share || !navigator.canShare){
-    showToast('⚠ Direct share not supported on this browser. Use Print/Save instead.','');
+    showToast('⚠ Direct share not supported. Use Print/Save instead.','');
     return;
   }
-
-  showToast('⏳ Generating PDF to share...', '');
-
-  const p = DB[currentParty];
-  let txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
-  if(dateFilterFrom) txs = txs.filter(t=>(t.date||'')>=dateFilterFrom);
-  if(dateFilterTo)   txs = txs.filter(t=>(t.date||'')<=dateFilterTo);
-  const openBal = p.opening_balance||0;
-  const totalDr = txs.reduce((s,t)=>s+(t.debit||0),0);
-  const totalCr = txs.reduce((s,t)=>s+(t.credit||0),0);
-  const closingBal = openBal+totalDr-totalCr;
-
-  const drTypes={}, crTypes={};
-  txs.filter(t=>t.debit>0).forEach(t=>{ drTypes[t.particular]=(drTypes[t.particular]||0)+t.debit; });
-  txs.filter(t=>t.credit>0).forEach(t=>{ crTypes[t.particular]=(crTypes[t.particular]||0)+t.credit; });
-
-  let drRows=`<tr style="background:#f0ebe0"><td><b>Opening Balance b/d</b></td><td style="text-align:right"><b>${fmt(openBal)}</b></td></tr>`;
-  Object.entries(drTypes).forEach(([k,v])=>{ drRows+=`<tr><td>${k}</td><td style="text-align:right">${fmt(v)}</td></tr>`; });
-  drRows+=`<tr style="background:#f0ebe0;font-weight:700"><td>TOTAL</td><td style="text-align:right">${fmt(openBal+totalDr)}</td></tr>`;
-
-  let crRows='';
-  Object.entries(crTypes).forEach(([k,v])=>{ crRows+=`<tr><td>${k}</td><td style="text-align:right">${fmt(v)}</td></tr>`; });
-  crRows+=`<tr style="background:#f0ebe0"><td><b>Closing Balance c/d</b></td><td style="text-align:right"><b>${fmt(closingBal)}</b></td></tr>`;
-  crRows+=`<tr style="background:#f0ebe0;font-weight:700"><td>TOTAL</td><td style="text-align:right">${fmt(totalCr+closingBal)}</td></tr>`;
-
-  let txRows=`<tr style="background:#f0e8d8"><td colspan="2"><b>OPENING BALANCE b/d</b></td><td></td><td></td><td></td><td style="text-align:right"><b>${fmt(openBal)}</b></td></tr>`;
-  txs.forEach((t,i)=>{
-    txRows+=`<tr style="background:${i%2?'#fff':'#faf7f0'}">
-      <td>${t.date||''}</td><td>${t.particular}</td><td style="text-align:center">${t.bn||''}</td>
-      <td style="text-align:right">${t.debit>0?fmt(t.debit):''}</td>
-      <td style="text-align:right">${t.credit>0?fmt(t.credit):''}</td>
-      <td style="text-align:right"><b>${fmt(safeNum(t.runningBalance))}</b></td>
-    </tr>`;
-  });
-  txRows+=`<tr style="background:#f0e8d8;font-weight:700"><td colspan="3">TOTAL / CLOSING BALANCE</td><td style="text-align:right;color:#8b1a1a">${fmt(totalDr)}</td><td style="text-align:right;color:#1a6b3a">${fmt(totalCr)}</td><td style="text-align:right">${fmt(closingBal)}</td></tr>`;
-
-  const coInfo=[COMPANY.pan?'PAN: '+COMPANY.pan:'',COMPANY.addr,COMPANY.phone?'Ph: '+COMPANY.phone:'',COMPANY.email,COMPANY.extra].filter(Boolean).join(' | ');
-  const filterInfo=dateFilterFrom||dateFilterTo?`<br><em>Period: ${dateFilterFrom||'start'} to ${dateFilterTo||'end'}</em>`:'';
-
-  const html=`<!DOCTYPE html><html><head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${p.name} Ledger</title>
-  <style>
-  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
-  @page{size:A4;margin:15mm;}
-  body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:20px;color:#000;background:#fff;}
-  .header{text-align:center;border-bottom:2px solid #8b1a1a;padding-bottom:12px;margin-bottom:16px}
-  .co-name{font-size:18px;font-weight:bold;color:#8b1a1a;letter-spacing:1px}
-  .co-info{font-size:10px;color:#555;margin-top:3px}
-  .party-name{font-size:15px;font-weight:bold;color:#333;margin-top:8px}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px}
-  th{background:#8b1a1a;color:#fff;padding:7px 10px;font-size:10px}
-  td{padding:5px 10px;border-bottom:1px solid #e8ddd0;font-size:11px;}
-  tr{page-break-inside:avoid;}
-  .conf-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
-  .conf-box{border:1px solid #ccc;border-radius:6px;overflow:hidden}
-  .conf-title{background:#8b1a1a;color:#fff;padding:7px 12px;font-size:10px;font-weight:bold}
-  @media print{
-    body{padding:0;}
-    .conf-grid{display:table;width:100%;}
-    .conf-box{display:inline-block;width:48%;vertical-align:top;margin-right:2%;}
-    tr{page-break-inside:avoid!important;}
-  }
-  </style></head><body>
-  <div class="header">
-    <div class="co-name">${COMPANY.name}</div>
-    <div class="co-info">${coInfo}</div>
-    <div class="party-name">Party Ledger — ${p.name}${p.pan?' | PAN: '+p.pan:''}${filterInfo}</div>
-    <div style="font-size:10px;color:#888;margin-top:4px">Printed: ${new Date().toLocaleString('en-IN')}</div>
-  </div>
-  <div class="conf-grid">
-    <div class="conf-box"><div class="conf-title">Debit Side</div><table>${drRows}</table></div>
-    <div class="conf-box"><div class="conf-title">Credit Side</div><table>${crRows}</table></div>
-  </div>
-  <table>
-    <thead><tr><th>Date (BS)</th><th>Particular</th><th>Bill No.</th><th>Debit (Dr.)</th><th>Credit (Cr.)</th><th>Balance</th></tr></thead>
-    <tbody>${txRows}</tbody>
-  </table>
-  <div style="text-align:right;font-size:10px;color:#888;margin-top:8px">K & K Trading Concern — Ledger System</div>
-  </body></html>`;
-
+  showToast('⏳ Generating PDF...', '');
   try {
-    const element = document.createElement('div');
-    element.innerHTML = html;
-    element.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;';
-    document.body.appendChild(element);
+    const p = DB[currentParty];
+    let txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+    if(dateFilterFrom) txs = txs.filter(t=>(t.date||'')>=dateFilterFrom);
+    if(dateFilterTo)   txs = txs.filter(t=>(t.date||'')<=dateFilterTo);
+    const openBal    = p.opening_balance||0;
+    const totalDr    = txs.reduce((s,t)=>s+(t.debit||0),0);
+    const totalCr    = txs.reduce((s,t)=>s+(t.credit||0),0);
+    const closingBal = openBal+totalDr-totalCr;
 
-    const opt = {
-      margin: 10,
-      filename: p.name.replace(/\s+/g,'_') + '_Ledger.pdf',
-      image: { type:'jpeg', quality:0.95 },
-      html2canvas: { scale:2, useCORS:true },
-      jsPDF: { unit:'mm', format:'a4', orientation:'portrait' }
-    };
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
 
-    const pdfBlob = await html2pdf()
-      .set(opt)
-      .from(element)
-      .outputPdf('blob');
+    // Header
+    doc.setFillColor(139,26,26);
+    doc.rect(0,0,210,22,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(14);
+    doc.text(COMPANY.name||'K & K Trade Concern', 105, 10, {align:'center'});
+    doc.setFontSize(8);
+    doc.setFont('helvetica','normal');
+    const coInfo = [
+      COMPANY.pan  ? 'PAN: '+COMPANY.pan   : '',
+      COMPANY.addr ||'',
+      COMPANY.phone? 'Ph: '+COMPANY.phone  : ''
+    ].filter(Boolean).join(' | ');
+    doc.text(coInfo, 105, 16, {align:'center'});
 
-    document.body.removeChild(element);
+    // Party title
+    doc.setTextColor(0,0,0);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(11);
+    doc.text('Party Ledger — '+p.name, 14, 30);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    doc.text('Printed: '+new Date().toLocaleString('en-IN'), 14, 36);
 
-    const fileName = (p.name||'Ledger').replace(/\s+/g,'_') + '_Ledger.pdf';
-    const file = new File([pdfBlob], fileName, { type:'application/pdf' });
+    // Summary box
+    doc.setDrawColor(200,200,200);
+    doc.setFillColor(250,247,240);
+    doc.roundedRect(14,40,182,18,2,2,'FD');
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    doc.text('Opening Bal: '+fmt(openBal),         18, 47);
+    doc.text('Total Sales (Dr): '+fmt(totalDr),    75, 47);
+    doc.text('Total Received (Cr): '+fmt(totalCr), 133,47);
+    doc.setTextColor(139,26,26);
+    doc.text('Outstanding: '+fmt(closingBal),       18, 54);
+    doc.setTextColor(0,0,0);
 
-    if(navigator.canShare({ files:[file] })){
+    // Table header
+    let y = 65;
+    doc.setFillColor(139,26,26);
+    doc.rect(14,y,182,7,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(8);
+    doc.setFont('helvetica','bold');
+    doc.text('Date',      16, y+5);
+    doc.text('Particular',42, y+5);
+    doc.text('Bill No',  100, y+5);
+    doc.text('Debit',    125, y+5, {align:'right'});
+    doc.text('Credit',   153, y+5, {align:'right'});
+    doc.text('Balance',  194, y+5, {align:'right'});
+    y += 9;
+
+    // Opening balance row
+    doc.setTextColor(0,0,0);
+    doc.setFillColor(240,232,216);
+    doc.rect(14,y-2,182,7,'F');
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    doc.text('OPENING BALANCE b/d', 16, y+3);
+    doc.text(fmt(openBal), 194, y+3, {align:'right'});
+    doc.setFont('helvetica','normal');
+    y += 8;
+
+    // Transaction rows
+    txs.forEach((t,i)=>{
+      if(y > 270){ doc.addPage(); y = 15; }
+      if(i%2===0){
+        doc.setFillColor(250,247,240);
+        doc.rect(14,y-2,182,7,'F');
+      }
+      doc.setFontSize(8);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(0,0,0);
+      doc.text((t.date||'').substring(0,10),    16,  y+3);
+      doc.text((t.particular||'').substring(0,22), 42, y+3);
+      doc.text((t.bn||'').substring(0,12),      100, y+3);
+      if(safeNum(t.debit)>0)
+        doc.text(fmt(t.debit),  125, y+3, {align:'right'});
+      if(safeNum(t.credit)>0)
+        doc.text(fmt(t.credit), 153, y+3, {align:'right'});
+      doc.setFont('helvetica','bold');
+      doc.text(fmt(safeNum(t.runningBalance)), 194, y+3, {align:'right'});
+      y += 7;
+    });
+
+    // Total row
+    doc.setFillColor(240,232,216);
+    doc.rect(14,y-2,182,8,'F');
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    doc.text('TOTAL / CLOSING BALANCE', 16, y+4);
+    doc.setTextColor(139,26,26);
+    doc.text(fmt(totalDr),    125, y+4, {align:'right'});
+    doc.setTextColor(26,107,58);
+    doc.text(fmt(totalCr),    153, y+4, {align:'right'});
+    doc.setTextColor(0,0,0);
+    doc.text(fmt(closingBal), 194, y+4, {align:'right'});
+
+    // Share
+    const pdfBlob = doc.output('blob');
+    const fileName = (p.name||'Ledger').replace(/\s+/g,'_')+'_Ledger.pdf';
+    const file = new File([pdfBlob], fileName, {type:'application/pdf'});
+    if(navigator.canShare({files:[file]})){
       await navigator.share({
-        title: p.name + ' — Ledger Statement',
-        text: 'Account statement from ' + (COMPANY.name||'K & K Trade Concern'),
+        title: p.name+' — Ledger Statement',
+        text: 'Statement from '+(COMPANY.name||'K & K Trade Concern'),
         files: [file]
       });
-      showToast('✅ Shared successfully!','green');
+      showToast('✅ Shared!','green');
     } else {
-      showToast('⚠ File sharing not supported. Use Print/Save instead.','');
+      showToast('⚠ File sharing not supported on this browser.','');
     }
   } catch(err){
-    if(err.name !== 'AbortError'){
-      showToast('❌ Share failed: ' + err.message, 'red');
+    if(err.name!=='AbortError'){
+      showToast('❌ Share failed: '+err.message,'red');
     }
   }
 }
@@ -5826,78 +5836,125 @@ async function shareReceiptPDF(){
     showToast('⚠ Direct share not supported. Use Print/Save instead.','');
     return;
   }
-
   showToast('⏳ Generating receipt PDF...', '');
-
-  const receiptContent = document.getElementById('receiptPreviewContent').innerHTML;
-  const printStyles = '<style>' +
-    '@import url(\'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;600;700&display=swap\');' +
-    '*{box-sizing:border-box;margin:0;padding:0;}' +
-    'body{margin:0;font-family:\'DM Sans\',sans-serif;background:#fff;color:#1a1208;}' +
-    '.rp-header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:20px 24px;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-    '.rp-company{font-family:\'Playfair Display\',serif;font-size:20px;font-weight:700;}' +
-    '.rp-company-sub{font-size:11px;opacity:.8;margin-top:3px;}' +
-    '.rp-title-bar{background:#b8860b;color:#fff;text-align:center;padding:8px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-    '.rp-body{padding:20px 24px;}' +
-    '.rp-meta{display:flex;justify-content:space-between;font-size:12px;color:#6b5d4f;margin-bottom:16px;flex-wrap:wrap;gap:6px;}' +
-    '.rp-received-from{font-size:13px;margin-bottom:16px;padding:10px 14px;background:#faf7f0;border-radius:8px;border-left:3px solid #8b1a1a;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-    '.rp-received-from span{font-weight:700;color:#8b1a1a;font-size:15px;}' +
-    '.rp-amount-box{background:#e8f5ec;border:2px solid #1a6b3a;border-radius:10px;padding:16px 20px;text-align:center;margin-bottom:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-    '.rp-amount-label{font-size:11px;color:#1a6b3a;font-weight:600;text-transform:uppercase;letter-spacing:1px;}' +
-    '.rp-amount-val{font-size:28px;font-weight:700;color:#1a6b3a;margin:4px 0;}' +
-    '.rp-amount-words{font-size:11px;color:#2d5a3a;font-style:italic;}' +
-    '.rp-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:12px;}' +
-    '.rp-detail-item{padding:8px 12px;background:#faf7f0;border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-    '.rp-detail-item .lbl{color:#6b5d4f;font-size:10px;text-transform:uppercase;font-weight:600;}' +
-    '.rp-detail-item .val{color:#1a1208;font-weight:600;margin-top:2px;}' +
-    '.rp-balance-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff3cd;border-radius:8px;border:1px solid #ffc107;margin-bottom:16px;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-    '.rp-balance-row.settled{background:#e8f5ec;border-color:#1a6b3a;}' +
-    '.rp-footer{border-top:1px dashed #d9cfc0;padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#6b5d4f;}' +
-    '.rp-sig{text-align:right;}' +
-    '.rp-sig-line{border-top:1px solid #1a1208;width:120px;margin-top:28px;margin-bottom:4px;}' +
-    '@media print{body{margin:0;}@page{margin:10mm;}}' +
-    '</style>';
-  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt - ' + (_rcLastReceiptData.rcNo||'') + '</title>' + printStyles + '</head><body>' + receiptContent + '</body></html>';
-
   try {
-    const element = document.createElement('div');
-    element.innerHTML = html;
-    element.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:148mm;';
-    document.body.appendChild(element);
-
     const d = _rcLastReceiptData;
-    const fileName = 'Receipt_' + (d.rcNo||'') + '_' +
-                     (d.partyName||'').replace(/\s+/g,'_') + '.pdf';
-    const opt = {
-      margin: 8,
-      filename: fileName,
-      image: { type:'jpeg', quality:0.95 },
-      html2canvas: { scale:2, useCORS:true },
-      jsPDF: { unit:'mm', format:'a5', orientation:'portrait' }
-    };
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'mm', format:'a5', orientation:'portrait' });
+    const W = 148;
 
-    const pdfBlob = await html2pdf()
-      .set(opt)
-      .from(element)
-      .outputPdf('blob');
+    // Header
+    doc.setFillColor(139,26,26);
+    doc.rect(0,0,W,20,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(13);
+    doc.text(COMPANY.name||'K & K Trade Concern', W/2, 9, {align:'center'});
+    doc.setFontSize(7);
+    doc.setFont('helvetica','normal');
+    const sub = [
+      COMPANY.pan ? 'PAN: '+COMPANY.pan : '',
+      COMPANY.addr||''
+    ].filter(Boolean).join(' | ');
+    doc.text(sub, W/2, 15, {align:'center'});
 
-    document.body.removeChild(element);
+    // RECEIPT title bar
+    doc.setFillColor(184,134,11);
+    doc.rect(0,20,W,8,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.text('RECEIPT', W/2, 25.5, {align:'center'});
 
-    const file = new File([pdfBlob], fileName, { type:'application/pdf' });
+    // Meta
+    doc.setTextColor(0,0,0);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    doc.text('Receipt No: '+(d.rcNo||''), 10, 36);
+    doc.text('Date: '+(d.date||''), W-10, 36, {align:'right'});
 
-    if(navigator.canShare({ files:[file] })){
+    // Received from box
+    doc.setFillColor(250,247,240);
+    doc.roundedRect(10,40,W-20,14,2,2,'F');
+    doc.setFontSize(8);
+    doc.setTextColor(80,80,80);
+    doc.text('Received from:', 14, 47);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(11);
+    doc.setTextColor(139,26,26);
+    doc.text(d.partyName||'', 14, 53);
+
+    // Amount box
+    doc.setFillColor(232,245,236);
+    doc.setDrawColor(26,107,58);
+    doc.roundedRect(10,58,W-20,18,2,2,'FD');
+    doc.setTextColor(80,80,80);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(7);
+    doc.text('Amount Received', W/2, 63, {align:'center'});
+    doc.setTextColor(26,107,58);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(16);
+    doc.text(fmt(d.amount||0), W/2, 71, {align:'center'});
+    if(d.amountWords){
+      doc.setFontSize(7);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(80,80,80);
+      doc.text(d.amountWords, W/2, 75, {align:'center'});
+    }
+
+    // Details
+    doc.setTextColor(0,0,0);
+    doc.setFontSize(8);
+    doc.setFont('helvetica','bold');
+    doc.text('Payment Mode:', 14, 85);
+    doc.setFont('helvetica','normal');
+    doc.text(d.type||'', 52, 85);
+    if(d.note){
+      doc.setFont('helvetica','bold');
+      doc.text('Note:', 14, 92);
+      doc.setFont('helvetica','normal');
+      doc.text(String(d.note).substring(0,50), 30, 92);
+    }
+
+    // Outstanding balance
+    const hasBalance = safeNum(d.balAfter) > 0;
+    doc.setFillColor(hasBalance ? 255:232, hasBalance ? 243:245, hasBalance ? 205:236);
+    doc.roundedRect(10,97,W-20,10,2,2,'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica','bold');
+    doc.text('Outstanding Balance:', 14, 104);
+    doc.setTextColor(hasBalance ? 139:26, hasBalance ? 26:107, hasBalance ? 26:58);
+    doc.text(fmt(safeNum(d.balAfter)), W-14, 104, {align:'right'});
+
+    // Thank you + signature
+    doc.setTextColor(100,100,100);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(7);
+    doc.text('Thank you for your payment!', 14, 118);
+    doc.setDrawColor(0,0,0);
+    doc.line(W-55, 128, W-10, 128);
+    doc.text('Authorised Signature', W-32, 132, {align:'center'});
+
+    // Share
+    const pdfBlob = doc.output('blob');
+    const fileName = 'Receipt_'+(d.rcNo||'')+'_'+
+                     (d.partyName||'').replace(/\s+/g,'_')+'.pdf';
+    const file = new File([pdfBlob], fileName, {type:'application/pdf'});
+
+    if(navigator.canShare({files:[file]})){
       await navigator.share({
-        title: 'Receipt ' + (d.rcNo||''),
-        text: 'Receipt from ' + (COMPANY.name||'K & K Trade Concern'),
+        title: 'Receipt '+(d.rcNo||''),
+        text: 'Receipt from '+(COMPANY.name||'K & K Trade Concern'),
         files: [file]
       });
-      showToast('✅ Shared successfully!','green');
+      showToast('✅ Shared!','green');
     } else {
-      showToast('⚠ File sharing not supported. Use Print/Save instead.','');
+      showToast('⚠ File sharing not supported on this browser.','');
     }
   } catch(err){
-    if(err.name !== 'AbortError'){
-      showToast('❌ Share failed: ' + err.message, 'red');
+    if(err.name!=='AbortError'){
+      showToast('❌ Share failed: '+err.message,'red');
     }
   }
 }
