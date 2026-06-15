@@ -30,6 +30,8 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%238b1a1a'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='%23f5e6c8' font-family='serif' font-weight='bold'>K</text></svg>">
 <!-- SheetJS — real .xlsx export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- html2pdf.js — PDF blob generation for Share PDF feature -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Nepali&family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -1762,6 +1764,19 @@ body {
   transform: scale(0.92);
   box-shadow: 0 2px 8px rgba(139, 26, 26, 0.4);
 }
+/* Share PDF button — ledger export bar */
+.exp-share {
+  background: linear-gradient(135deg, #1a6b3a, #145c30) !important;
+  color: #fff !important;
+}
+.exp-share:hover { opacity: 0.88; }
+/* Share PDF button — receipt modal */
+.rp-share-btn.share-pdf {
+  background: linear-gradient(135deg, #1a6b3a, #145c30);
+  color: #fff;
+  border: none;
+}
+.rp-share-btn.share-pdf:hover { opacity: 0.88; }
 </style>
 </head>
 <body>
@@ -2140,6 +2155,7 @@ body {
           <button class="exp-btn exp-wa" onclick="shareWhatsApp()">📱 WhatsApp</button>
           <button class="exp-btn exp-xl" onclick="exportExcel()">📊 Excel</button>
           <button class="exp-btn exp-pdf" onclick="exportPDF()">🖨️ PDF</button>
+          <button class="exp-btn exp-share" onclick="shareLedgerPDF()" title="Share PDF directly to WhatsApp or any app">📤 Share PDF</button>
         </div>
       </div>
       <!-- PARTY INFO CARD -->
@@ -2367,6 +2383,7 @@ body {
       <div class="rp-share-btns">
         <button class="rp-share-btn wa" onclick="rcShareWhatsApp()">📱 Share on WhatsApp</button>
         <button class="rp-share-btn pdf" onclick="rcPrintPDF()">🖨️ Print / Save PDF</button>
+        <button class="rp-share-btn share-pdf" onclick="shareReceiptPDF()" title="Share PDF directly to WhatsApp or any app">📤 Share PDF</button>
         <button class="rp-share-btn close" onclick="closeReceiptModal()">✕ Close</button>
       </div>
     </div>
@@ -4146,6 +4163,137 @@ function exportPDF(){
   }, 1200);
 }
 
+// ── SHARE LEDGER PDF ──
+async function shareLedgerPDF(){
+  if(!currentParty){ showToast('No party selected','red'); return; }
+
+  if(!navigator.share || !navigator.canShare){
+    showToast('⚠ Direct share not supported on this browser. Use Print/Save instead.','');
+    return;
+  }
+
+  showToast('⏳ Generating PDF to share...', '');
+
+  const p = DB[currentParty];
+  let txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+  if(dateFilterFrom) txs = txs.filter(t=>(t.date||'')>=dateFilterFrom);
+  if(dateFilterTo)   txs = txs.filter(t=>(t.date||'')<=dateFilterTo);
+  const openBal = p.opening_balance||0;
+  const totalDr = txs.reduce((s,t)=>s+(t.debit||0),0);
+  const totalCr = txs.reduce((s,t)=>s+(t.credit||0),0);
+  const closingBal = openBal+totalDr-totalCr;
+
+  const drTypes={}, crTypes={};
+  txs.filter(t=>t.debit>0).forEach(t=>{ drTypes[t.particular]=(drTypes[t.particular]||0)+t.debit; });
+  txs.filter(t=>t.credit>0).forEach(t=>{ crTypes[t.particular]=(crTypes[t.particular]||0)+t.credit; });
+
+  let drRows=`<tr style="background:#f0ebe0"><td><b>Opening Balance b/d</b></td><td style="text-align:right"><b>${fmt(openBal)}</b></td></tr>`;
+  Object.entries(drTypes).forEach(([k,v])=>{ drRows+=`<tr><td>${k}</td><td style="text-align:right">${fmt(v)}</td></tr>`; });
+  drRows+=`<tr style="background:#f0ebe0;font-weight:700"><td>TOTAL</td><td style="text-align:right">${fmt(openBal+totalDr)}</td></tr>`;
+
+  let crRows='';
+  Object.entries(crTypes).forEach(([k,v])=>{ crRows+=`<tr><td>${k}</td><td style="text-align:right">${fmt(v)}</td></tr>`; });
+  crRows+=`<tr style="background:#f0ebe0"><td><b>Closing Balance c/d</b></td><td style="text-align:right"><b>${fmt(closingBal)}</b></td></tr>`;
+  crRows+=`<tr style="background:#f0ebe0;font-weight:700"><td>TOTAL</td><td style="text-align:right">${fmt(totalCr+closingBal)}</td></tr>`;
+
+  let txRows=`<tr style="background:#f0e8d8"><td colspan="2"><b>OPENING BALANCE b/d</b></td><td></td><td></td><td></td><td style="text-align:right"><b>${fmt(openBal)}</b></td></tr>`;
+  txs.forEach((t,i)=>{
+    txRows+=`<tr style="background:${i%2?'#fff':'#faf7f0'}">
+      <td>${t.date||''}</td><td>${t.particular}</td><td style="text-align:center">${t.bn||''}</td>
+      <td style="text-align:right">${t.debit>0?fmt(t.debit):''}</td>
+      <td style="text-align:right">${t.credit>0?fmt(t.credit):''}</td>
+      <td style="text-align:right"><b>${fmt(safeNum(t.runningBalance))}</b></td>
+    </tr>`;
+  });
+  txRows+=`<tr style="background:#f0e8d8;font-weight:700"><td colspan="3">TOTAL / CLOSING BALANCE</td><td style="text-align:right;color:#8b1a1a">${fmt(totalDr)}</td><td style="text-align:right;color:#1a6b3a">${fmt(totalCr)}</td><td style="text-align:right">${fmt(closingBal)}</td></tr>`;
+
+  const coInfo=[COMPANY.pan?'PAN: '+COMPANY.pan:'',COMPANY.addr,COMPANY.phone?'Ph: '+COMPANY.phone:'',COMPANY.email,COMPANY.extra].filter(Boolean).join(' | ');
+  const filterInfo=dateFilterFrom||dateFilterTo?`<br><em>Period: ${dateFilterFrom||'start'} to ${dateFilterTo||'end'}</em>`:'';
+
+  const html=`<!DOCTYPE html><html><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${p.name} Ledger</title>
+  <style>
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
+  @page{size:A4;margin:15mm;}
+  body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:20px;color:#000;background:#fff;}
+  .header{text-align:center;border-bottom:2px solid #8b1a1a;padding-bottom:12px;margin-bottom:16px}
+  .co-name{font-size:18px;font-weight:bold;color:#8b1a1a;letter-spacing:1px}
+  .co-info{font-size:10px;color:#555;margin-top:3px}
+  .party-name{font-size:15px;font-weight:bold;color:#333;margin-top:8px}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  th{background:#8b1a1a;color:#fff;padding:7px 10px;font-size:10px}
+  td{padding:5px 10px;border-bottom:1px solid #e8ddd0;font-size:11px;}
+  tr{page-break-inside:avoid;}
+  .conf-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+  .conf-box{border:1px solid #ccc;border-radius:6px;overflow:hidden}
+  .conf-title{background:#8b1a1a;color:#fff;padding:7px 12px;font-size:10px;font-weight:bold}
+  @media print{
+    body{padding:0;}
+    .conf-grid{display:table;width:100%;}
+    .conf-box{display:inline-block;width:48%;vertical-align:top;margin-right:2%;}
+    tr{page-break-inside:avoid!important;}
+  }
+  </style></head><body>
+  <div class="header">
+    <div class="co-name">${COMPANY.name}</div>
+    <div class="co-info">${coInfo}</div>
+    <div class="party-name">Party Ledger — ${p.name}${p.pan?' | PAN: '+p.pan:''}${filterInfo}</div>
+    <div style="font-size:10px;color:#888;margin-top:4px">Printed: ${new Date().toLocaleString('en-IN')}</div>
+  </div>
+  <div class="conf-grid">
+    <div class="conf-box"><div class="conf-title">Debit Side</div><table>${drRows}</table></div>
+    <div class="conf-box"><div class="conf-title">Credit Side</div><table>${crRows}</table></div>
+  </div>
+  <table>
+    <thead><tr><th>Date (BS)</th><th>Particular</th><th>Bill No.</th><th>Debit (Dr.)</th><th>Credit (Cr.)</th><th>Balance</th></tr></thead>
+    <tbody>${txRows}</tbody>
+  </table>
+  <div style="text-align:right;font-size:10px;color:#888;margin-top:8px">K & K Trading Concern — Ledger System</div>
+  </body></html>`;
+
+  try {
+    const element = document.createElement('div');
+    element.innerHTML = html;
+    element.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;';
+    document.body.appendChild(element);
+
+    const opt = {
+      margin: 10,
+      filename: p.name.replace(/\s+/g,'_') + '_Ledger.pdf',
+      image: { type:'jpeg', quality:0.95 },
+      html2canvas: { scale:2, useCORS:true },
+      jsPDF: { unit:'mm', format:'a4', orientation:'portrait' }
+    };
+
+    const pdfBlob = await html2pdf()
+      .set(opt)
+      .from(element)
+      .outputPdf('blob');
+
+    document.body.removeChild(element);
+
+    const fileName = (p.name||'Ledger').replace(/\s+/g,'_') + '_Ledger.pdf';
+    const file = new File([pdfBlob], fileName, { type:'application/pdf' });
+
+    if(navigator.canShare({ files:[file] })){
+      await navigator.share({
+        title: p.name + ' — Ledger Statement',
+        text: 'Account statement from ' + (COMPANY.name||'K & K Trade Concern'),
+        files: [file]
+      });
+      showToast('✅ Shared successfully!','green');
+    } else {
+      showToast('⚠ File sharing not supported. Use Print/Save instead.','');
+    }
+  } catch(err){
+    if(err.name !== 'AbortError'){
+      showToast('❌ Share failed: ' + err.message, 'red');
+    }
+  }
+}
+
 // ── EXPORT SUMMARY PDF ──
 function exportSummaryPDF(){
   const keys = Object.keys(DB).sort((a,b)=>DB[a].name.localeCompare(DB[b].name));
@@ -5666,6 +5814,92 @@ function rcPrintPDF(){
   setTimeout(function(){
     try{ if(pw && !pw.closed){ pw.focus(); pw.print(); } }catch(e){}
   }, 1200);
+}
+
+// ── SHARE RECEIPT PDF ──
+async function shareReceiptPDF(){
+  if(!_rcLastReceiptData){
+    showToast('No receipt data. Save a receipt first.','red');
+    return;
+  }
+  if(!navigator.share || !navigator.canShare){
+    showToast('⚠ Direct share not supported. Use Print/Save instead.','');
+    return;
+  }
+
+  showToast('⏳ Generating receipt PDF...', '');
+
+  const receiptContent = document.getElementById('receiptPreviewContent').innerHTML;
+  const printStyles = '<style>' +
+    '@import url(\'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;600;700&display=swap\');' +
+    '*{box-sizing:border-box;margin:0;padding:0;}' +
+    'body{margin:0;font-family:\'DM Sans\',sans-serif;background:#fff;color:#1a1208;}' +
+    '.rp-header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:20px 24px;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-company{font-family:\'Playfair Display\',serif;font-size:20px;font-weight:700;}' +
+    '.rp-company-sub{font-size:11px;opacity:.8;margin-top:3px;}' +
+    '.rp-title-bar{background:#b8860b;color:#fff;text-align:center;padding:8px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-body{padding:20px 24px;}' +
+    '.rp-meta{display:flex;justify-content:space-between;font-size:12px;color:#6b5d4f;margin-bottom:16px;flex-wrap:wrap;gap:6px;}' +
+    '.rp-received-from{font-size:13px;margin-bottom:16px;padding:10px 14px;background:#faf7f0;border-radius:8px;border-left:3px solid #8b1a1a;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-received-from span{font-weight:700;color:#8b1a1a;font-size:15px;}' +
+    '.rp-amount-box{background:#e8f5ec;border:2px solid #1a6b3a;border-radius:10px;padding:16px 20px;text-align:center;margin-bottom:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-amount-label{font-size:11px;color:#1a6b3a;font-weight:600;text-transform:uppercase;letter-spacing:1px;}' +
+    '.rp-amount-val{font-size:28px;font-weight:700;color:#1a6b3a;margin:4px 0;}' +
+    '.rp-amount-words{font-size:11px;color:#2d5a3a;font-style:italic;}' +
+    '.rp-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:12px;}' +
+    '.rp-detail-item{padding:8px 12px;background:#faf7f0;border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-detail-item .lbl{color:#6b5d4f;font-size:10px;text-transform:uppercase;font-weight:600;}' +
+    '.rp-detail-item .val{color:#1a1208;font-weight:600;margin-top:2px;}' +
+    '.rp-balance-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff3cd;border-radius:8px;border:1px solid #ffc107;margin-bottom:16px;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.rp-balance-row.settled{background:#e8f5ec;border-color:#1a6b3a;}' +
+    '.rp-footer{border-top:1px dashed #d9cfc0;padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#6b5d4f;}' +
+    '.rp-sig{text-align:right;}' +
+    '.rp-sig-line{border-top:1px solid #1a1208;width:120px;margin-top:28px;margin-bottom:4px;}' +
+    '@media print{body{margin:0;}@page{margin:10mm;}}' +
+    '</style>';
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt - ' + (_rcLastReceiptData.rcNo||'') + '</title>' + printStyles + '</head><body>' + receiptContent + '</body></html>';
+
+  try {
+    const element = document.createElement('div');
+    element.innerHTML = html;
+    element.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:148mm;';
+    document.body.appendChild(element);
+
+    const d = _rcLastReceiptData;
+    const fileName = 'Receipt_' + (d.rcNo||'') + '_' +
+                     (d.partyName||'').replace(/\s+/g,'_') + '.pdf';
+    const opt = {
+      margin: 8,
+      filename: fileName,
+      image: { type:'jpeg', quality:0.95 },
+      html2canvas: { scale:2, useCORS:true },
+      jsPDF: { unit:'mm', format:'a5', orientation:'portrait' }
+    };
+
+    const pdfBlob = await html2pdf()
+      .set(opt)
+      .from(element)
+      .outputPdf('blob');
+
+    document.body.removeChild(element);
+
+    const file = new File([pdfBlob], fileName, { type:'application/pdf' });
+
+    if(navigator.canShare({ files:[file] })){
+      await navigator.share({
+        title: 'Receipt ' + (d.rcNo||''),
+        text: 'Receipt from ' + (COMPANY.name||'K & K Trade Concern'),
+        files: [file]
+      });
+      showToast('✅ Shared successfully!','green');
+    } else {
+      showToast('⚠ File sharing not supported. Use Print/Save instead.','');
+    }
+  } catch(err){
+    if(err.name !== 'AbortError'){
+      showToast('❌ Share failed: ' + err.message, 'red');
+    }
+  }
 }
 
 // ── PHASE 4: BILL SERIAL GAP CHECKER ──
