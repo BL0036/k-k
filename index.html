@@ -4184,6 +4184,9 @@ async function shareLedgerPDF(){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
 
+    // PDF-safe number formatter — helvetica can't render रू symbol
+    const pf = n => 'Rs. ' + Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
+
     // Header
     doc.setFillColor(139,26,26);
     doc.rect(0,0,210,22,'F');
@@ -4215,11 +4218,11 @@ async function shareLedgerPDF(){
     doc.roundedRect(14,40,182,18,2,2,'FD');
     doc.setFontSize(9);
     doc.setFont('helvetica','bold');
-    doc.text('Opening Bal: '+fmt(openBal),         18, 47);
-    doc.text('Total Sales (Dr): '+fmt(totalDr),    75, 47);
-    doc.text('Total Received (Cr): '+fmt(totalCr), 133,47);
+    doc.text('Opening Bal: '+pf(openBal),         18, 47);
+    doc.text('Total Sales (Dr): '+pf(totalDr),    75, 47);
+    doc.text('Total Received (Cr): '+pf(totalCr), 133,47);
     doc.setTextColor(139,26,26);
-    doc.text('Outstanding: '+fmt(closingBal),       18, 54);
+    doc.text('Outstanding: '+pf(closingBal),       18, 54);
     doc.setTextColor(0,0,0);
 
     // Table header
@@ -4232,9 +4235,9 @@ async function shareLedgerPDF(){
     doc.text('Date',      16, y+5);
     doc.text('Particular',42, y+5);
     doc.text('Bill No',  100, y+5);
-    doc.text('Debit',    125, y+5, {align:'right'});
-    doc.text('Credit',   153, y+5, {align:'right'});
-    doc.text('Balance',  194, y+5, {align:'right'});
+    doc.text('Debit',    128, y+5, {align:'right'});
+    doc.text('Credit',   158, y+5, {align:'right'});
+    doc.text('Balance',  196, y+5, {align:'right'});
     y += 9;
 
     // Opening balance row
@@ -4244,30 +4247,30 @@ async function shareLedgerPDF(){
     doc.setFont('helvetica','bold');
     doc.setFontSize(8);
     doc.text('OPENING BALANCE b/d', 16, y+3);
-    doc.text(fmt(openBal), 194, y+3, {align:'right'});
+    doc.text(pf(openBal), 196, y+3, {align:'right'});
     doc.setFont('helvetica','normal');
     y += 8;
 
     // Transaction rows
     txs.forEach((t,i)=>{
-      if(y > 270){ doc.addPage(); y = 15; }
+      if(y > 272){ doc.addPage(); y = 15; }
       if(i%2===0){
         doc.setFillColor(250,247,240);
-        doc.rect(14,y-2,182,7,'F');
+        doc.rect(14,y-2,182,7.5,'F');
       }
       doc.setFontSize(8);
       doc.setFont('helvetica','normal');
       doc.setTextColor(0,0,0);
-      doc.text((t.date||'').substring(0,10),    16,  y+3);
-      doc.text((t.particular||'').substring(0,22), 42, y+3);
-      doc.text((t.bn||'').substring(0,12),      100, y+3);
+      doc.text((t.date||'').substring(0,10),       16,  y+3.5);
+      doc.text((t.particular||'').substring(0,20), 42,  y+3.5);
+      doc.text((t.bn||'').substring(0,12),         100, y+3.5);
       if(safeNum(t.debit)>0)
-        doc.text(fmt(t.debit),  125, y+3, {align:'right'});
+        doc.text(pf(t.debit),  128, y+3.5, {align:'right'});
       if(safeNum(t.credit)>0)
-        doc.text(fmt(t.credit), 153, y+3, {align:'right'});
+        doc.text(pf(t.credit), 158, y+3.5, {align:'right'});
       doc.setFont('helvetica','bold');
-      doc.text(fmt(safeNum(t.runningBalance)), 194, y+3, {align:'right'});
-      y += 7;
+      doc.text(pf(safeNum(t.runningBalance)), 196, y+3.5, {align:'right'});
+      y += 7.5;
     });
 
     // Total row
@@ -4277,11 +4280,11 @@ async function shareLedgerPDF(){
     doc.setFontSize(8);
     doc.text('TOTAL / CLOSING BALANCE', 16, y+4);
     doc.setTextColor(139,26,26);
-    doc.text(fmt(totalDr),    125, y+4, {align:'right'});
+    doc.text(pf(totalDr),    128, y+4, {align:'right'});
     doc.setTextColor(26,107,58);
-    doc.text(fmt(totalCr),    153, y+4, {align:'right'});
+    doc.text(pf(totalCr),    158, y+4, {align:'right'});
     doc.setTextColor(0,0,0);
-    doc.text(fmt(closingBal), 194, y+4, {align:'right'});
+    doc.text(pf(closingBal), 196, y+4, {align:'right'});
 
     // Share
     const pdfBlob = doc.output('blob');
@@ -5843,6 +5846,9 @@ async function shareReceiptPDF(){
     const doc = new jsPDF({ unit:'mm', format:'a5', orientation:'portrait' });
     const W = 148;
 
+    // PDF-safe number formatter — helvetica can't render रू symbol
+    const pf = n => 'Rs. ' + Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
+
     // Header
     doc.setFillColor(139,26,26);
     doc.rect(0,0,W,20,'F');
@@ -5895,7 +5901,7 @@ async function shareReceiptPDF(){
     doc.setTextColor(26,107,58);
     doc.setFont('helvetica','bold');
     doc.setFontSize(16);
-    doc.text(fmt(d.amount||0), W/2, 71, {align:'center'});
+    doc.text(pf(d.amount||0), W/2, 71, {align:'center'});
     if(d.amountWords){
       doc.setFontSize(7);
       doc.setFont('helvetica','normal');
@@ -5925,7 +5931,7 @@ async function shareReceiptPDF(){
     doc.setFont('helvetica','bold');
     doc.text('Outstanding Balance:', 14, 104);
     doc.setTextColor(hasBalance ? 139:26, hasBalance ? 26:107, hasBalance ? 26:58);
-    doc.text(fmt(safeNum(d.balAfter)), W-14, 104, {align:'right'});
+    doc.text(pf(safeNum(d.balAfter)), W-14, 104, {align:'right'});
 
     // Thank you + signature
     doc.setTextColor(100,100,100);
