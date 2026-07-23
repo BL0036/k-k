@@ -1861,13 +1861,23 @@ body {
           <button onclick="copyFirebaseRules()" style="position:absolute;top:6px;right:6px;padding:4px 10px;font-size:11px;background:var(--gold);color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:'DM Sans',sans-serif;z-index:1">📋 Copy</button>
           <textarea id="firebaseRulesBox" readonly style="width:100%;height:100px;font-family:monospace;font-size:12px;padding:10px;border:1.5px solid var(--border);border-radius:7px;background:#1a1208;color:#e8d5a3;resize:none;line-height:1.6">{
   "rules": {
-    ".read": true,
-    ".write": true
+    ".read": "auth != null",
+    ".write": "auth != null"
   }
 }</textarea>
         </div>
         <div id="rulesCopied" style="font-size:12px;color:var(--green);margin-top:4px;min-height:16px"></div>
-        <p style="font-size:11px;color:var(--muted);margin-top:4px">Then click <strong>Publish</strong>. This allows your app to read/write data.</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">Then click <strong>Publish</strong>. These rules block everyone except this app (via the secret key below) — much safer than open rules, which let anyone on the internet who finds your database URL read or delete everything.</p>
+
+        <h4 style="color:var(--gold);margin-top:14px">Step 6 — Get Your Database Secret</h4>
+        <ol>
+          <li>In Firebase console, click the <strong>⚙ gear icon</strong> → <strong>Project settings</strong></li>
+          <li>Go to the <strong>Service accounts</strong> tab</li>
+          <li>Click <strong>Database secrets</strong> (near the bottom — may say "legacy")</li>
+          <li>Copy the secret shown there and paste it below</li>
+        </ol>
+        <input type="password" class="url-input" id="firebaseSecretInput" placeholder="Paste your Database Secret here" style="margin-top:6px">
+        <p style="font-size:11px;color:var(--muted);margin-top:5px">⚠ Treat this like a password — anyone with it can read/write your data. It's stored only on this device (localStorage), never in the app's source code or GitHub.</p>
       </div>
 
       <button class="modal-save" style="margin-top:12px" onclick="saveFirebaseUrl()">🔥 Connect & Sync</button>
@@ -1894,6 +1904,7 @@ body {
       <button class="nav-btn" onclick="showPage('reports');closeHamburger()">🔍 Reports</button>
       <button class="nav-btn" onclick="showPage('receipt');closeHamburger()">🧾 Receipt</button>
       <button class="nav-btn" onclick="showPage('rcregister');closeHamburger()">🗂️ Receipt Register</button>
+      <button class="nav-btn" onclick="showPage('archive');closeHamburger()">🗄️ Old Records</button>
       <div class="global-search-wrap" id="globalSearchWrap" style="flex:0 1 180px;min-width:110px;">
         <input type="text" id="globalSearchInput" class="global-search-input" placeholder="🔍 Search party..." autocomplete="off" oninput="globalSearchInput()" onkeydown="globalSearchKey(event)" style="font-size:11px;padding:4px 11px;">
         <div class="global-search-drop" id="globalSearchDrop"></div>
@@ -2461,6 +2472,65 @@ body {
     </div>
   </div>
 
+  <!-- OLD RECORDS / ARCHIVE PAGE — FISCAL YEAR SYSTEM (Phase 2) -->
+  <div class="page" id="page-archive">
+    <div id="archiveList">
+      <div class="page-title">🗄️ Old Records / Archive</div>
+      <div class="filter-bar">
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px">
+          Fiscal Year:
+          <select id="archiveFYSelect" onchange="loadArchiveFY()" style="padding:7px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--row-even);color:var(--text);outline:none;min-width:150px"></select>
+        </label>
+        <input type="text" id="archiveSearch" placeholder="🔍  Search party..." oninput="renderArchiveList()">
+      </div>
+      <div id="archiveEmptyMsg" style="display:none;text-align:center;color:var(--muted);padding:30px;font-size:13px"></div>
+      <div style="overflow-x:auto">
+      <table class="party-table" id="archiveTable">
+        <thead><tr>
+          <th>#</th><th>Party Name</th><th>PAN</th><th>Phone</th><th>Opening Bal.</th><th>Total Sales</th><th>Total Received</th><th>Closing Bal.</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="archiveListBody"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div id="archiveDetail" style="display:none">
+      <div class="ledger-header no-print" style="margin-bottom:10px;">
+        <button class="back-btn no-print" onclick="showArchiveList()">← Back</button>
+        <!-- FISCAL YEAR SYSTEM (Phase 3): exports for the FY currently open
+             in Archive — reuses exportExcel/exportPDF/shareLedgerPDF with
+             explicit (partyKey, fyCode) args instead of the current-page
+             defaults. -->
+        <div class="export-btns no-print">
+          <button class="exp-btn exp-xl" onclick="exportExcel(archiveCurrentParty, archiveSelectedFY)">📊 Excel</button>
+          <button class="exp-btn exp-pdf" onclick="exportPDF(archiveCurrentParty, archiveSelectedFY)">🖨️ PDF</button>
+          <button class="exp-btn exp-share" onclick="shareLedgerPDF(archiveCurrentParty, archiveSelectedFY)" title="Share PDF directly to WhatsApp or any app">📤 Share PDF</button>
+        </div>
+      </div>
+      <div class="party-info-card no-print" id="archivePartyInfoCard">
+        <div class="party-avatar" id="archivePartyAvatar">K</div>
+        <div class="party-info-main">
+          <div class="party-info-name" id="archiveDetailTitle">Party Name</div>
+          <div class="party-info-meta" id="archiveDetailMeta"></div>
+        </div>
+        <div class="party-info-bal">
+          <div class="party-bal-label">Closing Balance</div>
+          <div class="party-bal-val" id="archivePartyBalVal">रू 0</div>
+        </div>
+      </div>
+      <div class="ledger-summary" id="archiveDetailSummary"></div>
+      <div style="overflow-x:auto">
+      <table class="ledger-table" id="archiveDetailTable">
+        <thead><tr>
+          <th>#</th><th>Date (BS)</th><th>Particular</th><th>Bill No.</th>
+          <th>Debit (Dr.)</th><th>Credit (Cr.)</th><th>Balance</th><th>Note</th><th class="no-print"></th>
+        </tr></thead>
+        <tbody id="archiveDetailBody"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
 <!-- DUPLICATE BN WARNING MODAL -->
   <div class="modal-overlay" id="dupModal" style="display:none">
     <div class="modal-box" style="max-width:500px">
@@ -2494,6 +2564,21 @@ body {
         <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Downloads all party data as a .json file. Save this file somewhere safe — USB drive, Google Drive, email to yourself.</p>
         <button class="modal-save" style="width:auto;padding:10px 20px" onclick="downloadBackup()">⬇ Download JSON Backup</button>
       </div>
+
+      <!-- FISCAL YEAR SYSTEM (Phase 3): a SEPARATE, single-FY export — never
+           a substitute for the real backup above. Deliberately styled in
+           purple (not the accent color used for the real backup box) with
+           an explicit "not your real backup" warning so the two are never
+           confused. -->
+      <div style="background:#f3ecfa;border-radius:8px;padding:16px;margin-bottom:16px;border:1.5px solid #b490d8">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#6a1b9a">🗂️ Export Fiscal Year</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Downloads <strong>one fiscal year only</strong> (opening balance + that year's transactions + closing balance per party) as a .json file — for sharing or archiving a single year. <strong>This is NOT your full backup</strong> — always use "Download JSON Backup" above for that.</p>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <select id="fyExportSelect" style="padding:7px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--card);color:var(--text);outline:none;min-width:150px"></select>
+          <button class="modal-save" style="width:auto;padding:9px 18px;background:#6a1b9a;font-size:12px" onclick="exportFiscalYearBackup()">🗂️ Export This FY (.json)</button>
+        </div>
+      </div>
+
       <div style="background:var(--row-even);border-radius:8px;padding:16px;margin-bottom:16px;border:1px solid var(--border)">
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--green)">📤 Restore from Backup</div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:10px">⚠ This will REPLACE all current data with the backup. Make sure you download a backup first!</p>
@@ -2516,14 +2601,14 @@ body {
       </div>
 
       <div style="background:#e8f5ec;border-radius:8px;padding:14px 16px;margin-top:12px;border:1px solid #a5d6b0">
-        <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--green)">📅 Close Fiscal Year</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Archives all current transactions into a single opening balance entry per party. Use at the end of FY to keep the ledger fast and clean. A full backup is downloaded automatically before closing.</p>
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--green)">🗓️ Start Next Fiscal Year</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Moves the "current fiscal year" pointer forward. <strong>Nothing is deleted or archived</strong> — all transaction history stays exactly as-is and remains fully editable from Old Records at any time. Opening balances for every year are always computed live from the full history, never stored.</p>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px">New FY Label (e.g. FY 2083/84)</label>
-            <input type="text" id="fyLabel" placeholder="FY 2083/84" style="padding:7px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--row-even);color:var(--text);outline:none;width:160px">
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px">Optional note for this switch (cosmetic only)</label>
+            <input type="text" id="fyLabel" placeholder="e.g. Started by Wayne on..." style="padding:7px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--row-even);color:var(--text);outline:none;width:220px">
           </div>
-          <button class="modal-save" style="width:auto;padding:9px 18px;background:var(--green);font-size:12px;margin-top:18px" onclick="closeFiscalYear()">📅 Archive & Start New FY</button>
+          <button class="modal-save" style="width:auto;padding:9px 18px;background:var(--green);font-size:12px;margin-top:18px" onclick="startNextFiscalYear()">🗓️ Start Next Fiscal Year</button>
         </div>
         <div id="fyMsg" style="font-size:12px;color:var(--green);margin-top:8px;min-height:16px"></div>
       </div>
@@ -2827,6 +2912,15 @@ document.addEventListener('click',e=>{
 // ══════════════════════════════════════════════════════════════
 
 let FIREBASE_URL  = localStorage.getItem('kkFirebaseUrl') || '';
+// SECURITY: shared database secret, appended to every request as ?auth=
+// Required once database rules are locked to ".read/.write": "auth != null"
+let FIREBASE_SECRET = localStorage.getItem('kkFirebaseSecret') || '';
+// Builds a request URL with the auth secret attached correctly whether
+// the base URL already has a "?" (e.g. "?t=..." or "?stream=true") or not.
+function withAuth(url){
+  if(!FIREBASE_SECRET) return url; // not configured yet — unchanged behavior
+  return url + (url.includes('?') ? '&' : '?') + 'auth=' + encodeURIComponent(FIREBASE_SECRET);
+}
 // Legacy Google Sheets URL — kept only so old localStorage key doesn't error
 let SHEET_URL     = localStorage.getItem('kkSheetUrl') || '';
 let syncTimer     = null;
@@ -3011,6 +3105,7 @@ function setSyncError(msg){
 
 function openSetup(){
   document.getElementById('firebaseUrlInput').value = FIREBASE_URL;
+  document.getElementById('firebaseSecretInput').value = FIREBASE_SECRET;
   document.getElementById('setupSaved').textContent = '';
   document.getElementById('setupModal').style.display = 'flex';
 }
@@ -3029,6 +3124,7 @@ function copyFirebaseRules(){
 
 async function saveFirebaseUrl(){
   const url = document.getElementById('firebaseUrlInput').value.trim().replace(/\/+$/, '');
+  const secret = document.getElementById('firebaseSecretInput').value.trim();
   if(!url || !url.includes('firebaseio.com')){
     document.getElementById('setupSaved').textContent = '⚠ Please enter a valid Firebase Realtime Database URL.';
     document.getElementById('setupSaved').style.color = 'var(--red)';
@@ -3036,6 +3132,9 @@ async function saveFirebaseUrl(){
   }
   FIREBASE_URL = url;
   localStorage.setItem('kkFirebaseUrl', url);
+  FIREBASE_SECRET = secret;
+  if(secret){ localStorage.setItem('kkFirebaseSecret', secret); }
+  else { localStorage.removeItem('kkFirebaseSecret'); }
   document.getElementById('setupSaved').textContent = 'Connecting…';
   document.getElementById('setupSaved').style.color = 'var(--muted)';
   updateSyncBar();
@@ -3048,8 +3147,8 @@ async function saveFirebaseUrl(){
     // Start live listener now that Firebase is connected
     setTimeout(startLiveListener, 1000);
   } else {
-    setSyncError('Connection failed — check URL and database rules');
-    document.getElementById('setupSaved').textContent = '✗ Failed. Check URL and set rules to allow read/write.';
+    setSyncError('Connection failed — check URL, secret, and database rules');
+    document.getElementById('setupSaved').textContent = '✗ Failed. Check the URL, the Database Secret, and that rules are set correctly.';
     document.getElementById('setupSaved').style.color = 'var(--red)';
   }
 }
@@ -3087,7 +3186,7 @@ async function loadFromFirebase(){
   if(!navigator.onLine){ setSyncError('Offline — saved locally'); return 'error'; }
   setSyncing('Loading from Firebase…');
   try {
-    const url = FIREBASE_URL + FB_PATH + '?t=' + Date.now();
+    const url = withAuth(FIREBASE_URL + FB_PATH + '?t=' + Date.now());
     const resp = await fetch(url);
     if(!resp.ok){
       setSyncError('Load failed — HTTP ' + resp.status);
@@ -3126,7 +3225,7 @@ async function pushToFirebase(data){
   if(!navigator.onLine){ pendingSync = true; setSyncError('Offline — saved locally'); return false; }
   setSyncing('Saving to Firebase…');
   try {
-    const resp = await fetch(FIREBASE_URL + FB_PATH, {
+    const resp = await fetch(withAuth(FIREBASE_URL + FB_PATH), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -3163,7 +3262,7 @@ async function pushPartyToFirebase(key){
   DB[key]._updatedAt = Date.now();
   safeLocalSet('kkLedgerDB', JSON.stringify(DB));
   try {
-    const resp = await fetch(FIREBASE_URL + FB_PARTY_BASE + '/' + encodeURIComponent(key) + '.json', {
+    const resp = await fetch(withAuth(FIREBASE_URL + FB_PARTY_BASE + '/' + encodeURIComponent(key) + '.json'), {
       method: 'PUT',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(DB[key])
@@ -3210,7 +3309,7 @@ function startLiveListener(){
   if(!FIREBASE_URL || !navigator.onLine) return;
   stopLiveListener(); // stop any existing listener first
 
-  const url = FIREBASE_URL + FB_PATH.replace('.json','') + '.json?stream=true';
+  const url = withAuth(FIREBASE_URL + FB_PATH.replace('.json','') + '.json?stream=true');
   try {
     _liveSource = new EventSource(url);
 
@@ -3407,7 +3506,7 @@ window.addEventListener('pagehide', ()=>{
     // Use navigator.sendBeacon for fire-and-forget on page close
     const url = FIREBASE_URL + FB_PATH;
     const blob = new Blob([JSON.stringify(DB)], {type:'application/json'});
-    try { navigator.sendBeacon(url + '?_method=PUT', blob); } catch(e){}
+    try { navigator.sendBeacon(withAuth(url) + (FIREBASE_SECRET ? '&' : '?') + '_method=PUT', blob); } catch(e){}
   }
 });
 
@@ -3473,10 +3572,20 @@ function getBalance(key){
   const p = DB[key]; if(!p) return 0;
   let allTxs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
   if(!dateFilterFrom && !dateFilterTo){
-    // No filter: use centralized calculation
-    return calculatePartyBalance(p);
+    // FISCAL YEAR SYSTEM (Phase 2): no manual filter — default to the
+    // CURRENT fiscal year's balance (FY opening balance + this FY's
+    // activity) instead of the all-time balance. Uses getOpeningBalance()/
+    // getFYTransactions() from the FY helper section below, which are
+    // always recomputed live — nothing here is stored or cached.
+    const fy = getCurrentFY();
+    const openBal = getOpeningBalance(p, fy);
+    const fyTxs = getFYTransactions(p, fy);
+    const dr = fyTxs.reduce((s,t)=>s+safeNum(t.debit),0);
+    const cr = fyTxs.reduce((s,t)=>s+safeNum(t.credit),0);
+    return openBal + dr - cr;
   }
-  // Date filter active: compute opening balance from pre-filter txs, then add filtered period
+  // Manual date filter active — unchanged from before (explicit override,
+  // takes precedence over the FY default).
   const preTxs = allTxs.filter(t=>(t.date||'') < (dateFilterFrom||''));
   let openBal;
   if(dateFilterFrom){
@@ -3491,8 +3600,21 @@ function getBalance(key){
   const cr = filteredTxs.reduce((s,t)=>s+safeNum(t.credit),0);
   return openBal + dr - cr;
 }
-function getTotalDebit(key){ return DB[key].transactions.filter(t=>t.particular!=='TOTAL AMOUNT').reduce((s,t)=>s+(t.debit||0),0); }
-function getTotalCredit(key){ return DB[key].transactions.filter(t=>t.particular!=='TOTAL AMOUNT').reduce((s,t)=>s+(t.credit||0),0); }
+function getTotalDebit(key){
+  const p = DB[key]; if(!p) return 0;
+  if(!dateFilterFrom && !dateFilterTo){
+    // Default to current FY — see getBalance() above for the same rule.
+    return getFYTransactions(p, getCurrentFY()).reduce((s,t)=>s+safeNum(t.debit),0);
+  }
+  return p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT').reduce((s,t)=>s+(t.debit||0),0);
+}
+function getTotalCredit(key){
+  const p = DB[key]; if(!p) return 0;
+  if(!dateFilterFrom && !dateFilterTo){
+    return getFYTransactions(p, getCurrentFY()).reduce((s,t)=>s+safeNum(t.credit),0);
+  }
+  return p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT').reduce((s,t)=>s+(t.credit||0),0);
+}
 function getLastDate(key){
   const txs = DB[key].transactions.filter(t=>t.date && t.particular!=='TOTAL AMOUNT');
   return txs.length ? txs[txs.length-1].date : '';
@@ -3674,7 +3796,7 @@ function renderLedgerList(){
       <td><strong>${p.name}</strong> ${vBadge}${p.address?'<br><span style="font-size:11px;color:var(--muted)">'+p.address+'</span>':''}</td>
       <td style="font-size:12px;color:var(--muted)">${p.pan||'—'}</td>
       <td style="font-size:12px;color:var(--muted)">${p.phone||'—'}</td>
-      <td class="amt">${fmt(p.opening_balance)}</td>
+      <td class="amt">${fmt((dateFilterFrom||dateFilterTo) ? p.opening_balance : getOpeningBalance(p, getCurrentFY()))}</td>
       <td class="amt" style="color:var(--red)">${fmt(getTotalDebit(k))}</td>
       <td class="amt" style="color:var(--green)">${fmt(getTotalCredit(k))}</td>
       <td class="amt ${bc}">${fmt(bal)}</td>
@@ -3713,24 +3835,32 @@ function viewParty(key){
   const p = DB[key];
   document.getElementById('detailTitle').textContent=p.name;
   const valleyTag = (p.valley||'outside')==='inside' ? '🏙️ Inside Valley' : '🏔️ Outside Valley';
-  const metaParts = ['FY 2082/83', valleyTag];
+  const fyTag = (dateFilterFrom||dateFilterTo) ? 'Custom Period' : `FY ${getCurrentFY().replace('-','/')}`;
+  const metaParts = [fyTag, valleyTag];
   if(p.pan) metaParts.push('PAN: '+p.pan);
   if(p.phone) metaParts.push('Ph: '+p.phone);
   if(p.address) metaParts.push(p.address);
   document.getElementById('detailMeta').textContent = metaParts.join(' | ');
   
-  // Apply date filter
-  let txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
-  if(dateFilterFrom) txs = txs.filter(t=>(t.date||'') >= dateFilterFrom);
-  if(dateFilterTo)   txs = txs.filter(t=>(t.date||'') <= dateFilterTo);
-  
-  // Correct opening balance: if date filter active, use running balance just before filter start
-  let openBal;
-  if(dateFilterFrom){
-    const preTxs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT' && (t.date||'') < dateFilterFrom);
-    openBal = preTxs.length ? (preTxs[preTxs.length-1].runningBalance ?? safeNum(p.opening_balance)) : safeNum(p.opening_balance);
+  // FISCAL YEAR SYSTEM (Phase 2): default to the current FY's opening
+  // balance + transactions when no manual date filter is set. A manual
+  // filter (existing feature) is an explicit, more specific choice and
+  // still works exactly as before, taking precedence over the FY default.
+  let txs, openBal;
+  if(!dateFilterFrom && !dateFilterTo){
+    const fy = getCurrentFY();
+    openBal = getOpeningBalance(p, fy);
+    txs = getFYTransactions(p, fy);
   } else {
-    openBal = safeNum(p.opening_balance);
+    txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+    if(dateFilterFrom) txs = txs.filter(t=>(t.date||'') >= dateFilterFrom);
+    if(dateFilterTo)   txs = txs.filter(t=>(t.date||'') <= dateFilterTo);
+    if(dateFilterFrom){
+      const preTxs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT' && (t.date||'') < dateFilterFrom);
+      openBal = preTxs.length ? (preTxs[preTxs.length-1].runningBalance ?? safeNum(p.opening_balance)) : safeNum(p.opening_balance);
+    } else {
+      openBal = safeNum(p.opening_balance);
+    }
   }
   const totalDr = txs.reduce((s,t)=>s+(t.debit||0),0);
   const totalCr = txs.reduce((s,t)=>s+(t.credit||0),0);
@@ -3766,7 +3896,7 @@ function viewParty(key){
 
   document.getElementById('balDrCol').innerHTML=drRows;
   document.getElementById('balCrCol').innerHTML=crRows;
-  document.getElementById('balConfirmDate').textContent=dateFilterFrom||dateFilterTo ? `${dateFilterFrom||'start'} → ${dateFilterTo||'end'}` : 'FY 2082/83';
+  document.getElementById('balConfirmDate').textContent=dateFilterFrom||dateFilterTo ? `${dateFilterFrom||'start'} → ${dateFilterTo||'end'}` : `FY ${getCurrentFY().replace('-','/')}`;
   const checkRow = document.getElementById('balCheckRow');
   checkRow.className = balanced?'bal-check':'bal-check mismatch';
   checkRow.innerHTML = balanced
@@ -3857,24 +3987,41 @@ function xlStyleRange(ws, r1c1, r1, c1, r2, c2, bold, bgRGB){
   }
 }
 
-function exportExcel(){
-  if(!currentParty){ showToast('No party selected','red'); return; }
+// FISCAL YEAR SYSTEM (Phase 3): partyKeyArg/fyCodeArg let the Archive page
+// reuse this same exporter against an old FY (see exportArchiveExcel below).
+// Normal calls from the Ledger page pass nothing and get currentParty +
+// getCurrentFY() as before. A manual date filter (dateFilterFrom/To), where
+// already active, still wins over FY scoping — matching how Phase 2 already
+// treats the manual filter as an override for on-screen balances.
+function exportExcel(partyKeyArg, fyCodeArg){
+  const partyKey = partyKeyArg || currentParty;
+  if(!partyKey){ showToast('No party selected','red'); return; }
   loadSheetJS(()=>{
-    const p = DB[currentParty];
-    let txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+    const p = DB[partyKey];
+    const fyCode = fyCodeArg || (typeof getCurrentFY==='function' ? getCurrentFY() : null);
+    let txs, openBal;
 
-    // Apply date filter — same logic as viewParty
-    let openBal;
-    if(dateFilterFrom){
-      const preTxs = txs.filter(t=>(t.date||'') < dateFilterFrom);
-      openBal = preTxs.length
-        ? (preTxs[preTxs.length-1].runningBalance ?? safeNum(p.opening_balance))
-        : safeNum(p.opening_balance);
-      txs = txs.filter(t=>(t.date||'') >= dateFilterFrom);
+    if(dateFilterFrom || dateFilterTo){
+      // Manual date filter active — unchanged legacy behavior.
+      txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+      if(dateFilterFrom){
+        const preTxs = txs.filter(t=>(t.date||'') < dateFilterFrom);
+        openBal = preTxs.length
+          ? (preTxs[preTxs.length-1].runningBalance ?? safeNum(p.opening_balance))
+          : safeNum(p.opening_balance);
+        txs = txs.filter(t=>(t.date||'') >= dateFilterFrom);
+      } else {
+        openBal = safeNum(p.opening_balance);
+      }
+      if(dateFilterTo) txs = txs.filter(t=>(t.date||'') <= dateFilterTo);
+    } else if(fyCode && typeof getFYTransactions==='function' && typeof getOpeningBalance==='function'){
+      txs = getFYTransactions(p, fyCode);
+      openBal = getOpeningBalance(p, fyCode);
     } else {
+      // FY system unavailable for some reason — fall back to full history.
+      txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
       openBal = safeNum(p.opening_balance);
     }
-    if(dateFilterTo) txs = txs.filter(t=>(t.date||'') <= dateFilterTo);
 
     const totalDr    = txs.reduce((s,t)=>s+safeNum(t.debit),0);
     const totalCr    = txs.reduce((s,t)=>s+safeNum(t.credit),0);
@@ -3883,7 +4030,7 @@ function exportExcel(){
     const today      = new Date().toISOString().slice(0,10);
     const periodStr  = (dateFilterFrom||dateFilterTo)
       ? `Period: ${dateFilterFrom||'start'}  →  ${dateFilterTo||'end'}`
-      : 'Full Ledger (FY 2082/83)';
+      : fyCode ? `FY ${fyCode.replace('-','/')}` : 'Full Ledger';
 
     const coInfo = [
       COMPANY.name,
@@ -3957,16 +4104,22 @@ function exportExcel(){
   });
 }
 
+// FISCAL YEAR SYSTEM (Phase 3): both the summary sheet and each per-party
+// sheet now reflect getCurrentFY() only (opening balance + that FY's
+// transactions), instead of full all-time history, and print the actual
+// current FY instead of the previously hardcoded "FY 2082/83" label.
 function exportAllExcel(){
   loadSheetJS(()=>{
     const wb   = XLSX.utils.book_new();
     const today = new Date().toISOString().slice(0,10);
     const keys  = Object.keys(DB).sort((a,b)=>DB[a].name.localeCompare(DB[b].name));
+    const fyCode = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
+    const fyLabel = fyCode ? `FY ${fyCode.replace('-','/')}` : 'Full Ledger';
 
     // ── Summary sheet ──
     const summaryData = [
       [COMPANY.name + '  —  All Parties Ledger Summary'],
-      ['FY 2082/83  |  Exported: ' + today],
+      [fyLabel + '  |  Exported: ' + today],
       [],
       ['#','Party Name','PAN','Phone','Opening Bal','Total Sales (Dr.)','Total Received (Cr.)','Outstanding Balance','Last Entry'],
     ];
@@ -4002,9 +4155,9 @@ function exportAllExcel(){
 
     // ── Individual party sheets ──
     keys.forEach(k=>{
-      const p      = DB[k];
-      const txs    = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
-      const openBal= safeNum(p.opening_balance);
+      const p = DB[k];
+      const txs     = (fyCode && typeof getFYTransactions==='function') ? getFYTransactions(p, fyCode) : p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+      const openBal = (fyCode && typeof getOpeningBalance==='function') ? getOpeningBalance(p, fyCode) : safeNum(p.opening_balance);
       const totalDr= txs.reduce((s,t)=>s+safeNum(t.debit),0);
       const totalCr= txs.reduce((s,t)=>s+safeNum(t.credit),0);
       const closing= openBal+totalDr-totalCr;
@@ -4013,7 +4166,7 @@ function exportAllExcel(){
       const data = [
         [COMPANY.name],
         ['PARTY LEDGER  —  '+partyInfo],
-        ['Full Ledger (FY 2082/83)', '', '', '', '', '', 'Exported: '+today],
+        [fyLabel, '', '', '', '', '', 'Exported: '+today],
         [],
         ['#','Date (BS)','Particular','Bill No.','Debit (Sales)','Credit (Receipt)','Running Balance','Note'],
         ['','','OPENING BALANCE b/d','',fmtXL(openBal),'',fmtXL(openBal),''],
@@ -4050,13 +4203,26 @@ function exportAllExcel(){
 }
 
 // ── EXPORT PDF ──
-function exportPDF(){
-  if(!currentParty) return;
-  const p = DB[currentParty];
-  let txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
-  if(dateFilterFrom) txs = txs.filter(t=>(t.date||'')>=dateFilterFrom);
-  if(dateFilterTo)   txs = txs.filter(t=>(t.date||'')<=dateFilterTo);
-  const openBal=p.opening_balance||0;
+// FISCAL YEAR SYSTEM (Phase 3): same partyKeyArg/fyCodeArg pattern as
+// exportExcel above — see its comment for the full rationale.
+function exportPDF(partyKeyArg, fyCodeArg){
+  const partyKey = partyKeyArg || currentParty;
+  if(!partyKey) return;
+  const p = DB[partyKey];
+  const fyCode = fyCodeArg || (typeof getCurrentFY==='function' ? getCurrentFY() : null);
+  let txs, openBal;
+  if(dateFilterFrom || dateFilterTo){
+    txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+    if(dateFilterFrom) txs = txs.filter(t=>(t.date||'')>=dateFilterFrom);
+    if(dateFilterTo)   txs = txs.filter(t=>(t.date||'')<=dateFilterTo);
+    openBal = p.opening_balance||0;
+  } else if(fyCode && typeof getFYTransactions==='function' && typeof getOpeningBalance==='function'){
+    txs = getFYTransactions(p, fyCode);
+    openBal = getOpeningBalance(p, fyCode);
+  } else {
+    txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+    openBal = p.opening_balance||0;
+  }
   const totalDr=txs.reduce((s,t)=>s+(t.debit||0),0);
   const totalCr=txs.reduce((s,t)=>s+(t.credit||0),0);
   const closingBal=openBal+totalDr-totalCr;
@@ -4086,7 +4252,9 @@ function exportPDF(){
   txRows+=`<tr style="background:#f0e8d8;font-weight:700"><td colspan="3">TOTAL / CLOSING BALANCE</td><td style="text-align:right;color:#8b1a1a">${fmt(totalDr)}</td><td style="text-align:right;color:#1a6b3a">${fmt(totalCr)}</td><td style="text-align:right">${fmt(closingBal)}</td></tr>`;
 
   const coInfo=[COMPANY.pan?'PAN: '+COMPANY.pan:'',COMPANY.addr,COMPANY.phone?'Ph: '+COMPANY.phone:'',COMPANY.email,COMPANY.extra].filter(Boolean).join(' | ');
-  const filterInfo=dateFilterFrom||dateFilterTo?`<br><em>Period: ${dateFilterFrom||'start'} to ${dateFilterTo||'end'}</em>`:'';
+  const filterInfo=(dateFilterFrom||dateFilterTo)
+    ? `<br><em>Period: ${dateFilterFrom||'start'} to ${dateFilterTo||'end'}</em>`
+    : (fyCode ? `<br><em>FY ${fyCode.replace('-','/')}</em>` : '');
 
   const html=`<!DOCTYPE html><html><head>
   <meta charset="UTF-8">
@@ -4164,19 +4332,32 @@ function exportPDF(){
 }
 
 // ── SHARE LEDGER PDF ──
-async function shareLedgerPDF(){
-  if(!currentParty){ showToast('No party selected','red'); return; }
+// FISCAL YEAR SYSTEM (Phase 3): same partyKeyArg/fyCodeArg pattern as
+// exportExcel/exportPDF above.
+async function shareLedgerPDF(partyKeyArg, fyCodeArg){
+  const partyKey = partyKeyArg || currentParty;
+  if(!partyKey){ showToast('No party selected','red'); return; }
   if(!navigator.share || !navigator.canShare){
     showToast('⚠ Direct share not supported. Use Print/Save instead.','');
     return;
   }
   showToast('⏳ Generating PDF...', '');
   try {
-    const p = DB[currentParty];
-    let txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
-    if(dateFilterFrom) txs = txs.filter(t=>(t.date||'')>=dateFilterFrom);
-    if(dateFilterTo)   txs = txs.filter(t=>(t.date||'')<=dateFilterTo);
-    const openBal    = p.opening_balance||0;
+    const p = DB[partyKey];
+    const fyCode = fyCodeArg || (typeof getCurrentFY==='function' ? getCurrentFY() : null);
+    let txs, openBal;
+    if(dateFilterFrom || dateFilterTo){
+      txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+      if(dateFilterFrom) txs = txs.filter(t=>(t.date||'')>=dateFilterFrom);
+      if(dateFilterTo)   txs = txs.filter(t=>(t.date||'')<=dateFilterTo);
+      openBal = p.opening_balance||0;
+    } else if(fyCode && typeof getFYTransactions==='function' && typeof getOpeningBalance==='function'){
+      txs = getFYTransactions(p, fyCode);
+      openBal = getOpeningBalance(p, fyCode);
+    } else {
+      txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
+      openBal = p.opening_balance||0;
+    }
     const totalDr    = txs.reduce((s,t)=>s+(t.debit||0),0);
     const totalCr    = txs.reduce((s,t)=>s+(t.credit||0),0);
     const closingBal = openBal+totalDr-totalCr;
@@ -4210,7 +4391,10 @@ async function shareLedgerPDF(){
     doc.text('Party Ledger — '+p.name, 14, 30);
     doc.setFont('helvetica','normal');
     doc.setFontSize(8);
-    doc.text('Printed: '+new Date().toLocaleString('en-IN'), 14, 36);
+    const shareFyLabel = (dateFilterFrom||dateFilterTo)
+      ? `Period: ${dateFilterFrom||'start'} to ${dateFilterTo||'end'}`
+      : (fyCode ? `FY ${fyCode.replace('-','/')}` : '');
+    doc.text('Printed: '+new Date().toLocaleString('en-IN')+(shareFyLabel?'   |   '+shareFyLabel:''), 14, 36);
 
     // Summary box
     doc.setDrawColor(200,200,200);
@@ -4348,6 +4532,11 @@ function exportSummaryPDF(){
 
   const coInfo=[COMPANY.pan?'PAN: '+COMPANY.pan:'',COMPANY.addr,COMPANY.phone?'Ph: '+COMPANY.phone:'',COMPANY.email].filter(Boolean).join(' | ');
   const valleyLabel = currentLedgerValleyTab==='inside'?'🏙️ Inside Valley':currentLedgerValleyTab==='outside'?'🏔️ Outside Valley':'All Parties';
+  // FISCAL YEAR SYSTEM (Phase 3): getBalance()/getTotalDebit()/getTotalCredit()
+  // used above are already current-FY-scoped by Phase 2's centralization —
+  // only the header label here was still hardcoded to "FY 2082/83".
+  const summaryFyCode = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
+  const summaryFyLabel = summaryFyCode ? `FY ${summaryFyCode.replace('-','/')}` : 'Full Ledger';
 
   const html=`<html><head><title>Ledger Summary</title>
   <style>
@@ -4370,7 +4559,7 @@ function exportSummaryPDF(){
   <div class="header">
     <div class="co-name">${COMPANY.name||'K & K TRADING CONCERN'}</div>
     <div class="co-info">${coInfo}</div>
-    <div class="doc-title">Party Ledger — Summary Statement &nbsp;|&nbsp; ${valleyLabel} &nbsp;|&nbsp; FY 2082/83</div>
+    <div class="doc-title">Party Ledger — Summary Statement &nbsp;|&nbsp; ${valleyLabel} &nbsp;|&nbsp; ${summaryFyLabel}</div>
     <div style="font-size:9px;color:#aaa;margin-top:3px">Printed: ${new Date().toLocaleString('en-IN')}</div>
   </div>
   <div class="stats-grid">
@@ -4572,6 +4761,46 @@ function recalcBalances(key){
 // Alias for clarity in new code
 const recalcParty = recalcBalances;
 
+// ══════════════════════════════════════════════════════════════
+//  FISCAL YEAR SYSTEM — Phase 2: FY-scoped balance helpers
+//  Same sign convention as calculatePartyBalance() above: balance
+//  moves by (debit - credit) per transaction, and the 'TOTAL AMOUNT'
+//  sentinel row is always excluded, exactly as everywhere else in
+//  the file. Both functions are always recomputed live from the
+//  full transaction history — nothing here is ever stored or
+//  cached, so editing an old transaction automatically ripples
+//  forward into every later FY's opening balance.
+// ══════════════════════════════════════════════════════════════
+
+// party.opening_balance is the party's original starting figure from
+// before the app existed — it is NOT specific to any one FY. It is
+// always the base, with every transaction dated before the target FY's
+// start added on top.
+function getOpeningBalance(party, fyCode){
+  if(!party) return 0;
+  const range = getFYDateRange(fyCode);
+  if(!range) return safeNum(party.opening_balance);
+  let bal = safeNum(party.opening_balance);
+  (party.transactions||[]).forEach(t=>{
+    if(t.particular==='TOTAL AMOUNT') return;
+    if((t.date||'') < range.start) bal += safeNum(t.debit) - safeNum(t.credit);
+  });
+  return bal;
+}
+
+// Transactions whose date falls inside the given FY (inclusive of both
+// ends), sorted chronologically. Excludes the 'TOTAL AMOUNT' sentinel,
+// matching how every other list-building function in this file treats it.
+function getFYTransactions(party, fyCode){
+  if(!party) return [];
+  const range = getFYDateRange(fyCode);
+  if(!range) return [];
+  return (party.transactions||[])
+    .filter(t=>t.particular!=='TOTAL AMOUNT' && t.date && t.date>=range.start && t.date<=range.end)
+    .slice()
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+}
+
 // ── DELETE PARTY ──
 function deleteParty(){
   const key=document.getElementById('epKey').value;
@@ -4693,6 +4922,11 @@ function openBackup(){
     const bsYear = parseInt(adToBsApprox().split('-')[0]);
     fyInput.value = 'FY ' + bsYear + '/' + (bsYear + 1 - 2000);
   }
+  // FISCAL YEAR SYSTEM (Phase 3): populate the "Export Fiscal Year" picker,
+  // reusing the same data-derived FY list as populateArchiveFYPicker() —
+  // unlike Archive, this includes the current FY too (exporting a snapshot
+  // of the year in progress is a valid use case).
+  populateFYExportPicker();
   // Refresh storage meter
   const pct = getStoragePercent();
   const usedKB = getStorageUsedKB();
@@ -4731,6 +4965,75 @@ function downloadBackup(){
   localStorage.setItem('kkLastBackupDate', Date.now().toString());
   const msg = document.getElementById('backupMsg');
   if(msg){ msg.textContent='✓ Backup downloaded! Save this file safely.'; msg.style.color='var(--green)'; }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FISCAL YEAR SYSTEM — Phase 3: EXPORT FISCAL YEAR (separate from backup)
+//  A NEW, separate action from downloadBackup() above — that function is
+//  untouched by this section, still writes every year's full data, and
+//  remains the safety-net backup. This is a single-FY convenience export:
+//  same per-party shape (opening balance / that FY's transactions / closing
+//  balance) as the Archive page already displays, just written to a file.
+// ══════════════════════════════════════════════════════════════
+
+// Reuses the same data-derived FY list as Archive's getAllFYCodesWithData(),
+// but does NOT exclude the current FY — exporting the in-progress year is
+// a valid use case here (unlike Archive, which is past-years-only).
+function populateFYExportPicker(){
+  const sel = document.getElementById('fyExportSelect');
+  if(!sel) return;
+  const prevSelected = sel.value;
+  const codes = (typeof getAllFYCodesWithData==='function' ? getAllFYCodesWithData() : []).slice().reverse(); // most recent first
+  if(!codes.length){
+    sel.innerHTML = '<option value="">No fiscal year data yet</option>';
+    return;
+  }
+  sel.innerHTML = codes.map(c=>`<option value="${c}">FY ${c.replace('-','/')}</option>`).join('');
+  sel.value = codes.includes(prevSelected) ? prevSelected : codes[0];
+}
+
+function exportFiscalYearBackup(){
+  const sel = document.getElementById('fyExportSelect');
+  const fyCode = sel ? sel.value : null;
+  if(!fyCode){ showToast('No fiscal year selected','red'); return; }
+  if(typeof getOpeningBalance!=='function' || typeof getFYTransactions!=='function'){
+    showToast('❌ Fiscal year system not available','red'); return;
+  }
+
+  const fyDb = {};
+  Object.keys(DB).forEach(k=>{
+    const p = DB[k];
+    const openBal = getOpeningBalance(p, fyCode);
+    const fyTxs   = getFYTransactions(p, fyCode);
+    // Same "nothing to show" skip Archive's list uses — no point shipping
+    // an all-zero party record in a single-FY export.
+    if(!fyTxs.length && Math.abs(openBal) < 0.01) return;
+    const dr = fyTxs.reduce((s,t)=>s+safeNum(t.debit),0);
+    const cr = fyTxs.reduce((s,t)=>s+safeNum(t.credit),0);
+    fyDb[k] = Object.assign({}, p, {
+      opening_balance: openBal,
+      transactions: fyTxs,
+      closing_balance: openBal + dr - cr,
+    });
+  });
+
+  const data = {
+    version: 2,
+    fiscalYear: fyCode,
+    exported: new Date().toISOString(),
+    company: COMPANY,
+    db: fyDb
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `KK_Ledger_FY_${fyCode}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✓ FY ${fyCode.replace('-','/')} exported! (This is NOT your full backup)`,'green');
+  const msg = document.getElementById('backupMsg');
+  if(msg){ msg.textContent=`✓ FY ${fyCode.replace('-','/')} export downloaded — remember this only covers one year, not a full backup.`; msg.style.color='#6a1b9a'; }
 }
 
 function resetToRAW(){
@@ -4780,63 +5083,48 @@ function restoreFromFile(input){
 }
 
 // ── CLOSE FISCAL YEAR ──────────────────────────────────────
-// Collapses all transactions into a single opening balance entry per party.
-// This keeps the ledger fast and prevents the DB from growing unbounded year after year.
-function closeFiscalYear(){
-  const fyLabel = (document.getElementById('fyLabel').value.trim()) || 'New FY';
-  const fyMsg   = document.getElementById('fyMsg');
+// ── START NEXT FISCAL YEAR ──
+// Nepali FY system (Phase 2): this used to be a destructive "Close Fiscal
+// Year" action that wiped every party's transaction history and collapsed
+// it into a single opening-balance row. That is incompatible with the FY
+// system, which depends on full history staying intact forever — opening
+// balances are always computed live from getOpeningBalance(), never stored.
+// This is now a pure "move the pointer forward" action: it advances the
+// global current-FY setting (setCurrentFY, from Phase 1) and touches
+// nothing else. No transaction, party, or balance is ever modified here.
+function startNextFiscalYear(){
+  const fyMsg = document.getElementById('fyMsg');
+  const currentFY = getCurrentFY();
+  if(!currentFY){ showToast('Could not determine current fiscal year','red'); return; }
 
-  const partyCount = Object.keys(DB).length;
-  if(!partyCount){ showToast('No parties to close','red'); return; }
+  const m = currentFY.match(/^(\d{4})-(\d{2})$/);
+  if(!m){ showToast('Invalid fiscal year code','red'); return; }
+  const nextStartYear = parseInt(m[1],10) + 1;
+  const nextFY = nextStartYear + '-' + String((nextStartYear+1) % 100).padStart(2,'0');
+
+  const labelInput = document.getElementById('fyLabel');
+  const label = labelInput ? labelInput.value.trim() : '';
 
   const ok = confirm(
-    `Close Fiscal Year and start "${fyLabel}"?\n\n` +
-    `This will:\n` +
-    `  • Download a full backup of all current data first\n` +
-    `  • Archive all ${partyCount} parties' transactions\n` +
-    `  • Set each party's opening balance to their current closing balance\n` +
-    `  • Clear all transaction history (archived in the backup)\n\n` +
-    `This CANNOT be undone without restoring from backup.\n` +
-    `Make sure you have downloaded a backup before continuing!`
+    `Start Next Fiscal Year?\n\n` +
+    `Current: FY ${currentFY.replace('-','/')}\n` +
+    `Next: FY ${nextFY.replace('-','/')}${label ? '  ("'+label+'")' : ''}\n\n` +
+    `This only moves the "current fiscal year" pointer forward.\n` +
+    `No transactions or balances are touched — all history stays exactly ` +
+    `as-is, and FY ${currentFY.replace('-','/')} remains fully editable from Old Records.`
   );
   if(!ok) return;
 
-  // Step 1: Download backup first (automatic safety net)
-  downloadBackup();
+  setCurrentFY(nextFY);
+  populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
+  if(typeof populateArchiveFYPicker==='function') populateArchiveFYPicker();
 
-  // Step 2: After a short delay (let download start), perform the close
-  setTimeout(()=>{
-    const closeDate = adToBsApprox().split('-').slice(0,2).join('-') + '-01'; // first of current month
-    Object.keys(DB).forEach(k=>{
-      const p = DB[k];
-      const closingBal = calculatePartyBalance(p);
-      // Replace all transactions with a single carried-forward opening balance note
-      p.transactions = [];
-      p.opening_balance = Math.round(closingBal * 100) / 100;
-      // Add a single "balance carried forward" marker transaction with zero value
-      // so the ledger shows when the FY was closed
-      p.transactions.push({
-        date: closeDate,
-        particular: 'OPENING BALANCE b/f',
-        bn: '',
-        note: 'Carried forward from previous FY — ' + fyLabel,
-        debit: 0,
-        credit: 0,
-        amount: closingBal,
-        runningBalance: Math.round(closingBal * 100) / 100
-      });
-      recalcBalances(k);
-    });
-
-    saveDB();
-    populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
-
-    if(fyMsg){
-      fyMsg.textContent = `✓ Fiscal year closed! ${partyCount} parties archived. Opening balances carried forward for ${fyLabel}.`;
-      fyMsg.style.color = 'var(--green)';
-    }
-    showToast(`✓ FY closed — ${partyCount} parties carried forward to ${fyLabel}`, 'green');
-  }, 1500);
+  if(fyMsg){
+    fyMsg.textContent = `✓ Now viewing FY ${nextFY.replace('-','/')}. All transaction history is unchanged and FY ${currentFY.replace('-','/')} is available under Old Records.`;
+    fyMsg.style.color = 'var(--green)';
+  }
+  showToast(`✓ Started FY ${nextFY.replace('-','/')}`, 'green');
+  if(labelInput) labelInput.value = '';
 }
 
 // ── AUTO BACKUP every 25 saves + 7-day reminder ──
@@ -4877,11 +5165,18 @@ function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const btns=['dashboard','billentry','billregister','ledger','reports','receipt','rcregister'];
+  const btns=['dashboard','billentry','billregister','ledger','reports','receipt','rcregister','archive'];
   const idx=btns.indexOf(name);
   if(idx>=0){ const nb=document.querySelectorAll('.nav-btn')[idx]; if(nb) nb.classList.add('active'); }
   if(name==='billregister'){
     renderBillRegister();
+    window.scrollTo(0,0);
+  }
+  if(name==='archive'){
+    // FISCAL YEAR SYSTEM (Phase 2): Old Records page — FY picker + the
+    // same kind of ledger view, scoped to whichever past FY is selected.
+    populateArchiveFYPicker();
+    renderArchiveList();
     window.scrollTo(0,0);
   }
   if(name==='entry'){
@@ -4905,7 +5200,23 @@ function showPage(name){
   }
   if(name==='billentry'){
     const dateEl=document.getElementById('beDate');
-    if(!dateEl.value) dateEl.value=lastEntryDate||BS_TODAY_APPROX||'';
+    if(!dateEl.value){
+      let def = lastEntryDate||BS_TODAY_APPROX||'';
+      // FISCAL YEAR SYSTEM (Phase 3): if the default date (today) doesn't
+      // fall inside the current FY — e.g. right after startNextFiscalYear()
+      // is called, or the BS-approx "today" hasn't rolled into the new FY
+      // yet — fall back to the current FY's start date instead of offering
+      // a date that lands in the previous year. User-typed/picked dates are
+      // never touched by this (see beDate onchange / attachDateHelpers).
+      if(typeof getCurrentFY==='function' && typeof getFiscalYear==='function'){
+        const curFY = getCurrentFY();
+        if(curFY && def && getFiscalYear(def)!==curFY && typeof getFYDateRange==='function'){
+          const range = getFYDateRange(curFY);
+          if(range && range.start) def = range.start;
+        }
+      }
+      dateEl.value = def;
+    }
     renderBillLog();
     updateNextBnHint();
     setTimeout(()=>{
@@ -4915,7 +5226,19 @@ function showPage(name){
   }
   if(name==='receipt'){
     const dateEl=document.getElementById('rcDate');
-    if(dateEl && !dateEl.value) dateEl.value=lastEntryDate||BS_TODAY_APPROX||'';
+    if(dateEl && !dateEl.value){
+      let def = lastEntryDate||BS_TODAY_APPROX||'';
+      // FISCAL YEAR SYSTEM (Phase 3): same FY-safety-net as Bill Entry above —
+      // see that block's comment for the full rationale.
+      if(typeof getCurrentFY==='function' && typeof getFiscalYear==='function'){
+        const curFY = getCurrentFY();
+        if(curFY && def && getFiscalYear(def)!==curFY && typeof getFYDateRange==='function'){
+          const range = getFYDateRange(curFY);
+          if(range && range.start) def = range.start;
+        }
+      }
+      dateEl.value = def;
+    }
     updateNextRcHint();
     setTimeout(()=>{ const el=document.getElementById('rcPartySearch'); if(el) el.focus({preventScroll:true}); window.scrollTo(0,0); },80);
   }
@@ -5094,7 +5417,7 @@ function renderDashboard(){
     html+=`<tr onclick="viewParty('${k}')">
       <td>${i+1}</td>
       <td><strong>${p.name}</strong> ${vBadge}${p.pan?'<br><span style="font-size:11px;color:var(--muted)">PAN: '+p.pan+'</span>':''}${p.phone?'<br><span style="font-size:11px;color:var(--muted)">📞 '+p.phone+'</span>':''}</td>
-      <td class="amt">${fmt(p.opening_balance)}</td>
+      <td class="amt">${fmt((dateFilterFrom||dateFilterTo) ? p.opening_balance : getOpeningBalance(p, getCurrentFY()))}</td>
       <td class="amt" style="color:var(--red)">${fmt(dr)}</td>
       <td class="amt" style="color:var(--green)">${fmt(cr)}</td>
       <td class="amt ${bc}">${fmt(bal)}</td>
@@ -5517,6 +5840,7 @@ function renderRcRegister(){
       const isReceipt = t.isDebit === false ||
                         RC_TYPES.includes(t.particular);
       if(!isReceipt) return;
+      if(getFiscalYear(t.date) !== getCurrentFY()) return; // FY SYSTEM: scope to current FY
       if(!t.bn) return;                        // must have receipt no
       if(typeFilter && t.particular !== typeFilter) return;
       const amt = safeNum(t.credit) || safeNum(t.amount) || 0;
@@ -5594,6 +5918,7 @@ function renderBillRegister(){
                      (t.isDebit !== false &&
                       !RC_TYPES.includes(t.particular));
       if(!isBill) return;
+      if(getFiscalYear(t.date) !== getCurrentFY()) return; // FY SYSTEM: scope to current FY
       if(!t.bn) return;                         // must have bill no
       if(typeFilter && t.particular !== typeFilter) return;
       const amt = safeNum(t.debit) || safeNum(t.amount) || 0;
@@ -5649,6 +5974,204 @@ function renderBillRegister(){
   if(countEl) countEl.textContent = rows.length + ' bill' + (rows.length===1?'':'s');
   if(totalEl) totalEl.textContent = 'Total: ' + fmt(total);
 }
+
+// ══════════════════════════════════════════════════════════════
+//  FISCAL YEAR SYSTEM — Phase 2: OLD RECORDS / ARCHIVE PAGE
+//  A read/edit view into past fiscal years. Reuses getOpeningBalance()/
+//  getFYTransactions() against a user-picked FY (instead of getCurrentFY())
+//  and reuses the ledger-detail rendering shape from viewParty(). Edits
+//  go through the exact same openEditTx()/saveEditTx()/deleteTx() path as
+//  every other view — there is no separate data path for old years.
+// ══════════════════════════════════════════════════════════════
+let archiveCurrentParty = null;
+let archiveSelectedFY = null;
+
+// Every FY code that has at least one transaction anywhere, earliest→latest,
+// derived from actual transaction dates — never hardcoded.
+function getAllFYCodesWithData(){
+  let minDate = null, maxDate = null;
+  Object.keys(DB).forEach(k=>{
+    (DB[k].transactions||[]).forEach(t=>{
+      if(t.particular==='TOTAL AMOUNT' || !t.date) return;
+      if(!minDate || t.date < minDate) minDate = t.date;
+      if(!maxDate || t.date > maxDate) maxDate = t.date;
+    });
+  });
+  if(!minDate || !maxDate) return [];
+  const firstYear = parseInt(getFiscalYear(minDate).split('-')[0],10);
+  const lastYear  = parseInt(getFiscalYear(maxDate).split('-')[0],10);
+  const codes = [];
+  for(let y=firstYear; y<=lastYear; y++) codes.push(y + '-' + String((y+1)%100).padStart(2,'0'));
+  return codes;
+}
+
+// Old Records = PAST years only. The current FY already lives on the
+// normal Dashboard/Ledger/Registers pages, so it's deliberately excluded
+// here to avoid two different pages showing the same "current" data.
+function populateArchiveFYPicker(){
+  const sel = document.getElementById('archiveFYSelect');
+  if(!sel) return;
+  const currentFY = getCurrentFY();
+  const codes = getAllFYCodesWithData().filter(c=>c!==currentFY).reverse(); // most recent first
+  const prevSelected = sel.value;
+  const emptyMsg = document.getElementById('archiveEmptyMsg');
+  const table = document.getElementById('archiveTable');
+  if(!codes.length){
+    sel.innerHTML = '<option value="">No archived years yet</option>';
+    archiveSelectedFY = null;
+    if(emptyMsg){ emptyMsg.style.display='block'; emptyMsg.textContent='No past fiscal years with data yet — everything on record is in the current fiscal year.'; }
+    if(table) table.style.display='none';
+    return;
+  }
+  if(emptyMsg) emptyMsg.style.display='none';
+  if(table) table.style.display='';
+  sel.innerHTML = codes.map(c=>`<option value="${c}">FY ${c.replace('-','/')}</option>`).join('');
+  sel.value = codes.includes(prevSelected) ? prevSelected : codes[0];
+  archiveSelectedFY = sel.value;
+}
+
+function loadArchiveFY(){
+  const sel = document.getElementById('archiveFYSelect');
+  archiveSelectedFY = sel ? sel.value : null;
+  showArchiveList();
+  renderArchiveList();
+}
+
+function renderArchiveList(){
+  const tbody = document.getElementById('archiveListBody');
+  if(!tbody) return;
+  if(!archiveSelectedFY){ tbody.innerHTML=''; return; }
+  const search = (document.getElementById('archiveSearch')?.value||'').toLowerCase();
+  let keys = Object.keys(DB).filter(k=>DB[k].name.toLowerCase().includes(search)||k.toLowerCase().includes(search));
+  keys.sort((a,b)=>DB[a].name.localeCompare(DB[b].name));
+  let html='';
+  let rowNum = 0;
+  keys.forEach(k=>{
+    const p = DB[k];
+    const openBal = getOpeningBalance(p, archiveSelectedFY);
+    const fyTxs = getFYTransactions(p, archiveSelectedFY);
+    if(!fyTxs.length && Math.abs(openBal)<0.01) return; // nothing to show for this party in this FY
+    const dr = fyTxs.reduce((s,t)=>s+safeNum(t.debit),0);
+    const cr = fyTxs.reduce((s,t)=>s+safeNum(t.credit),0);
+    const closingBal = openBal + dr - cr;
+    const bc = closingBal>0?'bal-pos':closingBal<0?'bal-neg':'bal-zero';
+    rowNum++;
+    html += `<tr onclick="viewArchiveParty('${k}')">
+      <td>${rowNum}</td>
+      <td><strong>${p.name}</strong></td>
+      <td style="font-size:12px;color:var(--muted)">${p.pan||'—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${p.phone||'—'}</td>
+      <td class="amt">${fmt(openBal)}</td>
+      <td class="amt" style="color:var(--red)">${fmt(dr)}</td>
+      <td class="amt" style="color:var(--green)">${fmt(cr)}</td>
+      <td class="amt ${bc}">${fmt(closingBal)}</td>
+      <td><button class="view-btn" onclick="event.stopPropagation();viewArchiveParty('${k}')">View</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html || '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">No activity for any party in this fiscal year</td></tr>';
+}
+
+function showArchiveList(){
+  document.getElementById('archiveList').style.display='block';
+  document.getElementById('archiveDetail').style.display='none';
+  archiveCurrentParty = null;
+}
+
+function viewArchiveParty(key){
+  archiveCurrentParty = key;
+  document.getElementById('archiveList').style.display='none';
+  document.getElementById('archiveDetail').style.display='block';
+  renderArchiveDetail();
+}
+
+function renderArchiveDetail(){
+  const key = archiveCurrentParty;
+  if(!key || !archiveSelectedFY || !DB[key]) return;
+  const p = DB[key];
+  document.getElementById('archiveDetailTitle').textContent = p.name;
+  document.getElementById('archiveDetailMeta').textContent =
+    `FY ${archiveSelectedFY.replace('-','/')}${p.pan?' | PAN: '+p.pan:''}${p.phone?' | Ph: '+p.phone:''}`;
+
+  const openBal = getOpeningBalance(p, archiveSelectedFY);
+  const txs = getFYTransactions(p, archiveSelectedFY);
+  const totalDr = txs.reduce((s,t)=>s+safeNum(t.debit),0);
+  const totalCr = txs.reduce((s,t)=>s+safeNum(t.credit),0);
+  const closingBal = openBal + totalDr - totalCr;
+
+  document.getElementById('archivePartyBalVal').textContent = fmt(closingBal);
+  document.getElementById('archiveDetailSummary').innerHTML = `
+    <div class="sum-card"><div class="sum-label">Opening Balance</div><div class="sum-val" style="color:var(--blue)">${fmt(openBal)}</div></div>
+    <div class="sum-card"><div class="sum-label">Total Sales (Dr.)</div><div class="sum-val" style="color:var(--red)">${fmt(totalDr)}</div></div>
+    <div class="sum-card"><div class="sum-label">Total Received (Cr.)</div><div class="sum-val" style="color:var(--green)">${fmt(totalCr)}</div></div>
+    <div class="sum-card"><div class="sum-label">Closing Balance</div><div class="sum-val" style="color:${closingBal>0?'var(--red)':'var(--green)'}">${fmt(closingBal)}</div></div>
+    <div class="sum-card"><div class="sum-label">Transactions</div><div class="sum-val" style="color:var(--muted)">${txs.length}</div></div>
+  `;
+
+  let html=`<tr style="background:rgba(139,26,26,0.08)"><td>0</td><td>—</td><td><strong>OPENING BALANCE b/d</strong></td><td>—</td><td class="amt"><strong>${fmt(openBal)}</strong></td><td>—</td><td class="amt"><strong>${fmt(openBal)}</strong></td><td>—</td><td class="no-print"></td></tr>`;
+  txs.forEach((t,i)=>{
+    const isD=t.debit>0, isC=t.credit>0;
+    const badge=isD?'<span class="badge badge-debit">Dr</span>':isC?'<span class="badge badge-credit">Cr</span>':'<span class="badge badge-neutral">—</span>';
+    // Real index into DB[key].transactions (same lookup convention as viewParty())
+    // so edits/deletes act on the actual stored transaction, not the filtered copy.
+    const realIdx = DB[key].transactions.findIndex(x=>x.date===t.date && x.amount===t.amount && x.billNo===t.billNo);
+    html+=`<tr class="${isD?'tr-debit':isC?'tr-credit':''}">
+      <td>${i+1}</td><td>${t.date||'—'}</td>
+      <td>${badge} ${t.particular}</td><td>${t.bn||'—'}</td>
+      <td class="amt">${t.debit>0?fmt(t.debit):'—'}</td>
+      <td class="amt">${t.credit>0?fmt(t.credit):'—'}</td>
+      <td class="amt"><strong>${fmt(t.runningBalance)}</strong></td>
+      <td class="note-cell" title="${t.note||''}">${t.note||''}</td>
+      <td class="no-print"><div class="tx-action-cell">
+        <button class="edit-tx-btn" onclick="openEditTx('${key}',${realIdx})">✏️</button>
+        <button class="del-btn" onclick="deleteTx('${key}',${realIdx})">✕</button>
+      </div></td>
+    </tr>`;
+  });
+  html+=`<tr style="background:rgba(139,26,26,0.08);font-weight:700">
+    <td colspan="4" style="text-align:right;padding-right:14px">TOTAL / CLOSING BALANCE c/d</td>
+    <td class="amt" style="color:var(--red)">${fmt(totalDr)}</td>
+    <td class="amt" style="color:var(--green)">${fmt(totalCr)}</td>
+    <td class="amt" style="color:var(--accent)">${fmt(closingBal)}</td>
+    <td></td><td class="no-print"></td>
+  </tr>`;
+  document.getElementById('archiveDetailBody').innerHTML = html;
+}
+
+// Keep the Archive page in sync when a transaction is edited/deleted —
+// same "capture original, wrap it" pattern already used elsewhere in this
+// file (see the Bill Entry balance-strip wrapper further down). Neither
+// saveEditTx() nor deleteTx() is modified — both still do exactly what they
+// did before, including navigating to the normal Ledger page via
+// viewParty(). This wrapper only restores the Archive page afterward if
+// Archive was the page the edit was actually made from, so an edit made
+// from Old Records doesn't silently kick the user back to the current FY.
+(function(){
+  function isArchiveActive(){
+    const el = document.getElementById('page-archive');
+    return !!(el && el.classList.contains('active'));
+  }
+  const _origSaveEditTx = saveEditTx;
+  saveEditTx = function(){
+    const wasArchive = isArchiveActive();
+    const key = document.getElementById('etKey') ? document.getElementById('etKey').value : null;
+    _origSaveEditTx.apply(this, arguments);
+    populateArchiveFYPicker();
+    if(wasArchive){
+      showPage('archive');
+      if(key && DB[key]) viewArchiveParty(key); else renderArchiveList();
+    }
+  };
+  const _origDeleteTx = deleteTx;
+  deleteTx = function(key, idx){
+    const wasArchive = isArchiveActive();
+    _origDeleteTx(key, idx);
+    populateArchiveFYPicker();
+    if(wasArchive){
+      showPage('archive');
+      if(DB[key]) viewArchiveParty(key); else renderArchiveList();
+    }
+  };
+})();
 
 function renderReceiptPreview(d){
   const typeLabel = {
@@ -7216,7 +7739,7 @@ function importFromExcel(input){
     CURRENT_FY = fyCode;
     try{ localStorage.setItem(FY_LOCAL_KEY, fyCode); }catch(e){}
     if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
-      fetch(FIREBASE_URL + FB_FY_PATH, {
+      fetch(withAuth(FIREBASE_URL + FB_FY_PATH), {
         method: 'PUT',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(fyCode)
@@ -7230,7 +7753,7 @@ function importFromExcel(input){
   async function loadCurrentFY(){
     if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
       try{
-        const resp = await fetch(FIREBASE_URL + FB_FY_PATH + '?t=' + Date.now());
+        const resp = await fetch(withAuth(FIREBASE_URL + FB_FY_PATH + '?t=' + Date.now()));
         if(resp.ok){
           const val = await resp.json();
           if(val && typeof val === 'string'){
