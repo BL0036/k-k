@@ -2614,6 +2614,15 @@ body {
         </div>
         <div id="fyMsg" style="font-size:12px;color:var(--green);margin-top:8px;min-height:16px"></div>
       </div>
+      <div style="background:#fff8e1;border-radius:8px;padding:14px 16px;margin-top:12px;border:1px solid #ffe082">
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#8d6e00">🛠️ Correct Current Fiscal Year</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Use this only if the "current fiscal year" above is showing the wrong year (e.g. it got moved forward by mistake). This directly sets the pointer — it does not touch any transactions or balances, and Bill No. / Receipt No. numbering will restart from 1 for whichever year you pick.</p>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <select id="fyCorrectSelect" style="padding:7px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--row-even);color:var(--text);outline:none"></select>
+          <button class="modal-save" style="width:auto;padding:9px 18px;background:#8d6e00;border-color:#8d6e00;font-size:12px" onclick="correctCurrentFY()">🛠️ Set as Current</button>
+        </div>
+        <div id="fyCorrectMsg" style="font-size:12px;color:#8d6e00;margin-top:8px;min-height:16px"></div>
+      </div>
       <div style="background:#e8f0fe;border-radius:8px;padding:16px;margin-top:12px;border:1px solid #b0c4f8">
         <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#1a3a6b">📊 Import from Excel</div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Import transactions from your Excel ledger. Adds to existing parties only. Skips unknown parties. Flags duplicate bill numbers.</p>
@@ -5031,6 +5040,7 @@ function openBackup(){
   // unlike Archive, this includes the current FY too (exporting a snapshot
   // of the year in progress is a valid use case).
   populateFYExportPicker();
+  if(typeof populateFyCorrectPicker==='function') populateFyCorrectPicker();
   // Refresh storage meter
   const pct = getStoragePercent();
   const usedKB = getStorageUsedKB();
@@ -5241,6 +5251,63 @@ function startNextFiscalYear(){
   }
   showToast(`✓ Started FY ${nextFY.replace('-','/')}`, 'green');
   if(labelInput) labelInput.value = '';
+}
+
+// ── CORRECT CURRENT FISCAL YEAR ──────────────────────────
+// Safety-valve for when the "current FY" pointer is wrong — most
+// commonly because "Start Next Fiscal Year" got clicked once too
+// often (or too early) and now sits ahead of the real BS date.
+// Unlike startNextFiscalYear(), this can move the pointer in EITHER
+// direction and jump straight to a specific year. It only ever
+// touches the pointer itself — never transactions or balances.
+function populateFyCorrectPicker(){
+  const sel = document.getElementById('fyCorrectSelect');
+  if(!sel) return;
+  const currentFY = getCurrentFY();
+  const todayFY = (typeof adToBsApprox==='function' && typeof getFiscalYear==='function')
+    ? getFiscalYear(adToBsApprox()) : null;
+  const dataCodes = (typeof getAllFYCodesWithData==='function') ? getAllFYCodesWithData() : [];
+  // Merge today's real FY + current pointer + every FY with data, dedup, sort
+  const codes = Array.from(new Set([...dataCodes, todayFY, currentFY].filter(Boolean))).sort();
+  sel.innerHTML = codes.map(c=>{
+    const tags = [c===currentFY?'current':null, c===todayFY?"today's date":null].filter(Boolean);
+    const label = 'FY ' + c.replace('-','/') + (tags.length ? ' (' + tags.join(', ') + ')' : '');
+    return `<option value="${c}"${c===currentFY?' selected':''}>${label}</option>`;
+  }).join('');
+}
+
+function correctCurrentFY(){
+  const sel = document.getElementById('fyCorrectSelect');
+  const msg = document.getElementById('fyCorrectMsg');
+  const picked = sel ? sel.value : '';
+  if(!picked){ showToast('Pick a fiscal year first','red'); return; }
+  const currentFY = getCurrentFY();
+  if(picked === currentFY){ showToast('That is already the current fiscal year','red'); return; }
+
+  const ok = confirm(
+    `Set Current Fiscal Year to FY ${picked.replace('-','/')}?\n\n` +
+    `Was: FY ${currentFY ? currentFY.replace('-','/') : '(none)'}\n` +
+    `Will become: FY ${picked.replace('-','/')}\n\n` +
+    `No transactions or balances are touched — all history stays exactly as-is.\n` +
+    `Bill No. and Receipt No. numbering will restart from 1 / RCP:1 for FY ${picked.replace('-','/')}.`
+  );
+  if(!ok) return;
+
+  setCurrentFY(picked);
+  viewFY = null; // snap Dashboard/Ledger year selector back to "current"
+  populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
+  if(typeof populateArchiveFYPicker==='function') populateArchiveFYPicker();
+  const beBillNoEl = document.getElementById('beBillNo');
+  if(beBillNoEl) beBillNoEl.value = '';
+  if(typeof updateNextBnHint==='function') updateNextBnHint();
+  if(typeof updateNextRcHint==='function') updateNextRcHint();
+  populateFyCorrectPicker();
+
+  if(msg){
+    msg.textContent = `✓ Current fiscal year is now FY ${picked.replace('-','/')}. Bill/Receipt numbering has restarted from 1 for this year.`;
+    msg.style.color = '#8d6e00';
+  }
+  showToast(`✓ Current FY set to ${picked.replace('-','/')}`, 'green');
 }
 
 // ── AUTO BACKUP every 25 saves + 7-day reminder ──
