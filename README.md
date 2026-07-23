@@ -32,5 +32,3 @@ mobile access" problem — was mine; I got AI help with the implementation.
 ## Installation
 _Internal business tool — not set up for external installation._
 
-## Screenshots
-_To add._
