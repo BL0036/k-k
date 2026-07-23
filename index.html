@@ -2061,6 +2061,7 @@ body {
         <option value="60">60+ Days Old</option>
         <option value="90">90+ Days Overdue</option>
       </select>
+      <select id="viewFYDash" onchange="setViewFY(this.value)" title="View a different fiscal year"></select>
       <button class="add-party-btn" onclick="openAddParty()">➕ Add New Party</button>
     </div>
     <div style="overflow-x:auto">
@@ -2144,6 +2145,7 @@ body {
           <option value="alpha">Sort: A → Z</option>
           <option value="recent">Sort: Recent Activity</option>
         </select>
+        <select id="viewFYLedger" onchange="setViewFY(this.value)" title="View a different fiscal year"></select>
         <button class="add-party-btn" onclick="openAddParty()">➕ Add New Party</button>
         <button class="exp-btn exp-xl" style="font-size:12px" onclick="exportAllExcel()">📊 Export All to Excel</button>
         <button class="exp-btn exp-pdf" style="font-size:12px" onclick="exportSummaryPDF()">🖨️ Summary PDF</button>
@@ -2932,6 +2934,66 @@ const SYNC_DEBOUNCE_MS  = 2000;
 const FB_PATH = '/kkledger/db.json'; // keep for full reads
 const FB_PARTY_BASE = '/kkledger/db'; // base for per-party writes
 
+// ══════════════════════════════════════════════════════════════
+//  EMPTY-DB PUSH GUARD  (added)
+//  Prevents a genuinely-empty in-memory DB from ever being pushed
+//  to Firebase unless this session has *confirmed* that empty
+//  state is real (as opposed to the result of a failed/timed-out
+//  Firebase read with no local cache to fall back on — the exact
+//  scenario that previously erased real data). See initDB(),
+//  loadFromFirebase(), the live listener, restoreFromFile(), and
+//  deleteParty() for where _dbLoadConfirmed gets set to true.
+// ══════════════════════════════════════════════════════════════
+let _dbLoadConfirmed = false;
+
+function _isEmptyDB(db){
+  return !db || typeof db !== 'object' || Object.keys(db).length === 0;
+}
+
+// Belt-and-suspenders check: only ever runs when we're about to push an
+// empty DB. Does one quick GET of Firebase's current value — if Firebase
+// currently holds real data, refuse the overwrite regardless of what the
+// session-tracking flag says (catches multi-tab / stale-session cases).
+// A failed/errored GET here does not itself block the push — the primary
+// defense is the _dbLoadConfirmed check the caller already performed.
+async function _confirmEmptyPushIsSafe(){
+  if(!FIREBASE_URL) return true;
+  try{
+    const resp = await fetch(withAuth(FIREBASE_URL + FB_PATH + '?t=' + Date.now()));
+    if(resp.ok){
+      const remote = await resp.json();
+      if(remote && typeof remote === 'object' && Object.keys(remote).length > 0){
+        return false; // Firebase currently has real data — never overwrite with empty
+      }
+    }
+    return true;
+  } catch(e){
+    return true;
+  }
+}
+
+// Central guard used by every full-DB push path. Returns true if the
+// push may proceed, false if it must be refused.
+async function _guardBeforePush(db){
+  if(!_isEmptyDB(db)) return true; // never blocks a save that has real data
+  if(!_dbLoadConfirmed){
+    _warnUnconfirmedEmptySave();
+    return false;
+  }
+  const safe = await _confirmEmptyPushIsSafe();
+  if(!safe){
+    _warnUnconfirmedEmptySave();
+    return false;
+  }
+  return true;
+}
+
+// Visible warning — console-only would not be seen by the user in time.
+function _warnUnconfirmedEmptySave(){
+  setSyncError('⚠ Data may not have loaded — reload before making changes');
+  showToast('⚠ Save blocked: your data may not have loaded correctly. Please reload the app before doing anything else.', 'red');
+}
+
 // ── LOAD DATA ──
 // Firebase is always the master source of truth.
 // On every startup: if Firebase URL is configured and device is online,
@@ -2948,7 +3010,7 @@ async function initDB(){
     if(stat) stat.textContent = 'Loading from Firebase…';
     setSyncing('Loading from Firebase…');
     try{
-      const resp = await fetch(FIREBASE_URL + FB_PATH + '?t=' + Date.now()); // bust any HTTP cache
+      const resp = await fetch(withAuth(FIREBASE_URL + FB_PATH + '?t=' + Date.now())); // bust any HTTP cache
       if(resp.ok){
         const fbData = await resp.json();
         if(fbData && typeof fbData === 'object' && Object.keys(fbData).length > 0){
@@ -2968,15 +3030,23 @@ async function initDB(){
           migrateValleyField();
           populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
           setSynced('Loaded from Firebase ✓');
+          _dbLoadConfirmed = true; // ADDED — Firebase returned real data, this session's DB is trustworthy
           // Start live listener for real-time updates
           setTimeout(startLiveListener, 1000);
           setTimeout(migrateValleyField, 2500);
           return; // Firebase loaded successfully — skip localStorage/RAW
+        } else {
+          // ADDED — resp.ok===true but Firebase genuinely has nothing
+          // (fbData is null/{}). This is Firebase *confirming* empty, not
+          // a failed read, so it's a legitimate state — not an accident.
+          _dbLoadConfirmed = true;
         }
       }
     }catch(e){
       console.warn('[KK] Firebase load failed on startup, falling back to localStorage:', e);
       setSyncError('Could not reach Firebase — showing local data');
+      // NOT setting _dbLoadConfirmed here — the read failed, so whatever
+      // DB ends up being below (including possibly empty) is unconfirmed.
     }
   }
 
@@ -2986,11 +3056,16 @@ async function initDB(){
     try{ DB = JSON.parse(stored); }catch(e){ DB = JSON.parse(JSON.stringify(RAW)); }
     Object.keys(DB).forEach(k=>recalcBalances(k));
     safeLocalSet('kkLedgerDB', JSON.stringify(DB));
+    // ADDED — a local cache that actually had real content counts as confirmed
+    if(!_isEmptyDB(DB)) _dbLoadConfirmed = true;
   } else {
     // Truly first-ever load with no Firebase — use hardcoded RAW as seed
     DB = JSON.parse(JSON.stringify(RAW));
     Object.keys(DB).forEach(k=>{ recalcBalances(k); });
     safeLocalSet('kkLedgerDB', JSON.stringify(DB));
+    // NOT setting _dbLoadConfirmed — RAW is an empty seed, not a confirmed
+    // real state. If FIREBASE_URL is set, this is exactly the "failed load,
+    // no cache" scenario the guard exists to protect against.
   }
   migrateValleyField();
   // If Firebase URL is set but we're offline, retry when back online
@@ -3204,11 +3279,13 @@ async function loadFromFirebase(){
         setTimeout(()=>{ if(FIREBASE_URL && navigator.onLine) pushToFirebase(DB); }, 500);
       }
       setSynced('Synced ✓ — ' + new Date().toLocaleTimeString());
+      _dbLoadConfirmed = true; // ADDED — real data confirmed from Firebase
       populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
       if(currentParty && DB[currentParty]) viewParty(currentParty);
       return 'data';
     } else {
       setSynced('Firebase empty — local data is latest');
+      _dbLoadConfirmed = true; // ADDED — Firebase confirmed empty (not a failed read)
       return 'empty';
     }
   } catch(e){
@@ -3223,6 +3300,8 @@ async function loadFromFirebase(){
 async function pushToFirebase(data){
   if(!FIREBASE_URL){ pendingSync = true; return false; }
   if(!navigator.onLine){ pendingSync = true; setSyncError('Offline — saved locally'); return false; }
+  // EMPTY-DB PUSH GUARD (added) — see definition near FIREBASE_URL above
+  if(!(await _guardBeforePush(data))) return false;
   setSyncing('Saving to Firebase…');
   try {
     const resp = await fetch(withAuth(FIREBASE_URL + FB_PATH), {
@@ -3342,6 +3421,7 @@ function startLiveListener(){
             setTimeout(()=>{ if(FIREBASE_URL && navigator.onLine && !isSyncing) pushToFirebase(DB); }, 500);
           }
           setSynced('Live update ✓ — ' + new Date().toLocaleTimeString());
+          _dbLoadConfirmed = true; // ADDED — authoritative live data from Firebase
           populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
           if(currentParty && DB[currentParty]) viewParty(currentParty);
           showToast('🔴 Live update received', 'green');
@@ -3480,6 +3560,15 @@ function saveDB(){
 
   if(syncTimer) clearTimeout(syncTimer);
   if(FIREBASE_URL){
+    // EMPTY-DB PUSH GUARD (added) — synchronous pre-check so we never even
+    // arm a debounced push or the pagehide/sendBeacon path (which can't do
+    // an async pre-check of its own) when DB is empty and unconfirmed.
+    // pushToFirebase() has its own (async, more thorough) copy of this
+    // guard as a second line of defense for any other caller.
+    if(_isEmptyDB(DB) && !_dbLoadConfirmed){
+      _warnUnconfirmedEmptySave();
+      return;
+    }
     // If page is being closed, push immediately — skip debounce to prevent data loss
     if(_pageUnloading){
       _isOwnSave = true;
@@ -3502,6 +3591,9 @@ function saveDB(){
 // Also push immediately when user navigates away (pagehide fires on mobile too)
 window.addEventListener('pagehide', ()=>{
   if(FIREBASE_URL && pendingSync && !isSyncing){
+    // EMPTY-DB PUSH GUARD (added) — sendBeacon is fire-and-forget and
+    // can't await the async guard, so do the same synchronous check here.
+    if(_isEmptyDB(DB) && !_dbLoadConfirmed) return;
     _isOwnSave = true;
     // Use navigator.sendBeacon for fire-and-forget on page close
     const url = FIREBASE_URL + FB_PATH;
@@ -3577,7 +3669,7 @@ function getBalance(key){
     // activity) instead of the all-time balance. Uses getOpeningBalance()/
     // getFYTransactions() from the FY helper section below, which are
     // always recomputed live — nothing here is stored or cached.
-    const fy = getCurrentFY();
+    const fy = getViewFY();
     const openBal = getOpeningBalance(p, fy);
     const fyTxs = getFYTransactions(p, fy);
     const dr = fyTxs.reduce((s,t)=>s+safeNum(t.debit),0);
@@ -3603,15 +3695,15 @@ function getBalance(key){
 function getTotalDebit(key){
   const p = DB[key]; if(!p) return 0;
   if(!dateFilterFrom && !dateFilterTo){
-    // Default to current FY — see getBalance() above for the same rule.
-    return getFYTransactions(p, getCurrentFY()).reduce((s,t)=>s+safeNum(t.debit),0);
+    // Default to viewed FY — see getBalance() above for the same rule.
+    return getFYTransactions(p, getViewFY()).reduce((s,t)=>s+safeNum(t.debit),0);
   }
   return p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT').reduce((s,t)=>s+(t.debit||0),0);
 }
 function getTotalCredit(key){
   const p = DB[key]; if(!p) return 0;
   if(!dateFilterFrom && !dateFilterTo){
-    return getFYTransactions(p, getCurrentFY()).reduce((s,t)=>s+safeNum(t.credit),0);
+    return getFYTransactions(p, getViewFY()).reduce((s,t)=>s+safeNum(t.credit),0);
   }
   return p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT').reduce((s,t)=>s+(t.credit||0),0);
 }
@@ -3752,7 +3844,7 @@ function submitEntry(){
   
   // ── Check for duplicate BN before saving ──
   if(bn && bn.trim()){
-    const dupes = checkDuplicateBN(party, bn);
+    const dupes = checkDuplicateBN(party, bn, null, date);
     if(dupes.length > 0){
       openDupModal(dupes, {party, date, particular, bn, amount, note, isDebit});
       return;
@@ -3796,7 +3888,7 @@ function renderLedgerList(){
       <td><strong>${p.name}</strong> ${vBadge}${p.address?'<br><span style="font-size:11px;color:var(--muted)">'+p.address+'</span>':''}</td>
       <td style="font-size:12px;color:var(--muted)">${p.pan||'—'}</td>
       <td style="font-size:12px;color:var(--muted)">${p.phone||'—'}</td>
-      <td class="amt">${fmt((dateFilterFrom||dateFilterTo) ? p.opening_balance : getOpeningBalance(p, getCurrentFY()))}</td>
+      <td class="amt">${fmt((dateFilterFrom||dateFilterTo) ? p.opening_balance : getOpeningBalance(p, getViewFY()))}</td>
       <td class="amt" style="color:var(--red)">${fmt(getTotalDebit(k))}</td>
       <td class="amt" style="color:var(--green)">${fmt(getTotalCredit(k))}</td>
       <td class="amt ${bc}">${fmt(bal)}</td>
@@ -3808,6 +3900,7 @@ function renderLedgerList(){
   });
   if(!html) html='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">No parties found</td></tr>';
   document.getElementById('ledgerListBody').innerHTML=html;
+  populateViewFYPicker('viewFYLedger');
 }
 
 // ── DATE FILTER ──
@@ -3835,7 +3928,7 @@ function viewParty(key){
   const p = DB[key];
   document.getElementById('detailTitle').textContent=p.name;
   const valleyTag = (p.valley||'outside')==='inside' ? '🏙️ Inside Valley' : '🏔️ Outside Valley';
-  const fyTag = (dateFilterFrom||dateFilterTo) ? 'Custom Period' : `FY ${getCurrentFY().replace('-','/')}`;
+  const fyTag = (dateFilterFrom||dateFilterTo) ? 'Custom Period' : `FY ${getViewFY().replace('-','/')}`;
   const metaParts = [fyTag, valleyTag];
   if(p.pan) metaParts.push('PAN: '+p.pan);
   if(p.phone) metaParts.push('Ph: '+p.phone);
@@ -3848,7 +3941,7 @@ function viewParty(key){
   // still works exactly as before, taking precedence over the FY default.
   let txs, openBal;
   if(!dateFilterFrom && !dateFilterTo){
-    const fy = getCurrentFY();
+    const fy = getViewFY();
     openBal = getOpeningBalance(p, fy);
     txs = getFYTransactions(p, fy);
   } else {
@@ -3896,7 +3989,7 @@ function viewParty(key){
 
   document.getElementById('balDrCol').innerHTML=drRows;
   document.getElementById('balCrCol').innerHTML=crRows;
-  document.getElementById('balConfirmDate').textContent=dateFilterFrom||dateFilterTo ? `${dateFilterFrom||'start'} → ${dateFilterTo||'end'}` : `FY ${getCurrentFY().replace('-','/')}`;
+  document.getElementById('balConfirmDate').textContent=dateFilterFrom||dateFilterTo ? `${dateFilterFrom||'start'} → ${dateFilterTo||'end'}` : `FY ${getViewFY().replace('-','/')}`;
   const checkRow = document.getElementById('balCheckRow');
   checkRow.className = balanced?'bal-check':'bal-check mismatch';
   checkRow.innerHTML = balanced
@@ -3909,8 +4002,10 @@ function viewParty(key){
     const isD=t.debit>0, isC=t.credit>0;
     const badge=isD?'<span class="badge badge-debit">Dr</span>':isC?'<span class="badge badge-credit">Cr</span>':'<span class="badge badge-neutral">—</span>';
     const realIdx = DB[key].transactions.findIndex(x=>x.date===t.date && x.amount===t.amount && x.billNo===t.billNo);
-    // Check if this BN is a duplicate within this party
-    const isDupBN = t.bn && t.bn.trim() && DB[key].transactions.filter((x,xi)=>x.bn && x.bn.trim()===t.bn.trim() && x.particular!=='TOTAL AMOUNT' && xi!==realIdx).length > 0;
+    // Check if this BN is a duplicate within this party (same fiscal year only —
+    // numbers legitimately restart each FY, see FISCAL YEAR SYSTEM notes above)
+    const tFY = (typeof getFiscalYear==='function') ? getFiscalYear(t.date) : null;
+    const isDupBN = t.bn && t.bn.trim() && DB[key].transactions.filter((x,xi)=>x.bn && x.bn.trim()===t.bn.trim() && x.particular!=='TOTAL AMOUNT' && xi!==realIdx && (!tFY || getFiscalYear(x.date)===tFY)).length > 0;
     const bnDisplay = t.bn ? (isDupBN ? `<span style="color:var(--gold);font-weight:700" title="⚠ Duplicate bill number">${t.bn} ⚠</span>` : t.bn) : '—';
     html+=`<tr class="${isD?'tr-debit':isC?'tr-credit':''}">
       <td>${i+1}</td><td>${t.date||'—'}</td>
@@ -3998,7 +4093,7 @@ function exportExcel(partyKeyArg, fyCodeArg){
   if(!partyKey){ showToast('No party selected','red'); return; }
   loadSheetJS(()=>{
     const p = DB[partyKey];
-    const fyCode = fyCodeArg || (typeof getCurrentFY==='function' ? getCurrentFY() : null);
+    const fyCode = fyCodeArg || (typeof getViewFY==='function' ? getViewFY() : null);
     let txs, openBal;
 
     if(dateFilterFrom || dateFilterTo){
@@ -4113,7 +4208,7 @@ function exportAllExcel(){
     const wb   = XLSX.utils.book_new();
     const today = new Date().toISOString().slice(0,10);
     const keys  = Object.keys(DB).sort((a,b)=>DB[a].name.localeCompare(DB[b].name));
-    const fyCode = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
+    const fyCode = (typeof getViewFY==='function') ? getViewFY() : null;
     const fyLabel = fyCode ? `FY ${fyCode.replace('-','/')}` : 'Full Ledger';
 
     // ── Summary sheet ──
@@ -4209,7 +4304,7 @@ function exportPDF(partyKeyArg, fyCodeArg){
   const partyKey = partyKeyArg || currentParty;
   if(!partyKey) return;
   const p = DB[partyKey];
-  const fyCode = fyCodeArg || (typeof getCurrentFY==='function' ? getCurrentFY() : null);
+  const fyCode = fyCodeArg || (typeof getViewFY==='function' ? getViewFY() : null);
   let txs, openBal;
   if(dateFilterFrom || dateFilterTo){
     txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
@@ -4344,7 +4439,7 @@ async function shareLedgerPDF(partyKeyArg, fyCodeArg){
   showToast('⏳ Generating PDF...', '');
   try {
     const p = DB[partyKey];
-    const fyCode = fyCodeArg || (typeof getCurrentFY==='function' ? getCurrentFY() : null);
+    const fyCode = fyCodeArg || (typeof getViewFY==='function' ? getViewFY() : null);
     let txs, openBal;
     if(dateFilterFrom || dateFilterTo){
       txs = p.transactions.filter(t=>t.particular!=='TOTAL AMOUNT');
@@ -4535,7 +4630,7 @@ function exportSummaryPDF(){
   // FISCAL YEAR SYSTEM (Phase 3): getBalance()/getTotalDebit()/getTotalCredit()
   // used above are already current-FY-scoped by Phase 2's centralization —
   // only the header label here was still hardcoded to "FY 2082/83".
-  const summaryFyCode = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
+  const summaryFyCode = (typeof getViewFY==='function') ? getViewFY() : null;
   const summaryFyLabel = summaryFyCode ? `FY ${summaryFyCode.replace('-','/')}` : 'Full Ledger';
 
   const html=`<html><head><title>Ledger Summary</title>
@@ -4675,7 +4770,7 @@ function saveEditTx(){
   if(safeNum(amt) <= 0){ showToast('Amount must be greater than 0!','red'); return; }
   // Check for duplicate BN (excluding current transaction index)
   if(bn && bn.trim()){
-    const dupes = checkDuplicateBN(key, bn, idx);
+    const dupes = checkDuplicateBN(key, bn, idx, date);
     if(dupes.length > 0){
       // Show which dupes exist
       const dupInfo = dupes.map(d=>`${d.date||'—'} ${d.particular} ${d.debit>0?'Dr रू'+Number(d.debit).toLocaleString('en-IN'):'Cr रू'+Number(d.credit).toLocaleString('en-IN')}`).join('\n');
@@ -4809,6 +4904,7 @@ function deleteParty(){
   const confirm_val=prompt(`Delete "${DB[key].name}"?\n${txCount>0?txCount+' transactions will be permanently lost.\n':''}\nType DELETE to confirm:`);
   if(confirm_val!=='DELETE') return;
   delete DB[key];
+  _dbLoadConfirmed = true; // ADDED — explicit UI deletion is a legitimate DB state, even if it's now empty
   saveDB(); closeEditParty();
   if(currentParty===key){ currentParty=null; showLedgerList(); }
   populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
@@ -4836,12 +4932,20 @@ function showToast(msg,type=''){
 // ── DUPLICATE BILL NUMBER CHECK ──
 let _pendingDupEntry = null; // stores entry data while user fills reason
 
-function checkDuplicateBN(partyKey, bn, excludeIdx=null){
+// FISCAL YEAR SYSTEM: bill/receipt numbers restart each FY (see
+// getNextBillNumber/getNextReceiptNumber), so "duplicate" only makes
+// sense WITHIN the same fiscal year. dateForFY should be the date of
+// the entry being saved/edited — pass it so old-year reuse of the
+// same number never gets flagged. If omitted (or FY helpers aren't
+// loaded), falls back to the old all-history behaviour.
+function checkDuplicateBN(partyKey, bn, excludeIdx=null, dateForFY=null){
   // Skip check if BN is empty
   if(!bn || !bn.trim()) return [];
+  const fy = (dateForFY && typeof getFiscalYear==='function') ? getFiscalYear(dateForFY) : null;
   const txs = DB[partyKey].transactions.filter((t,i)=>{
     if(t.particular==='TOTAL AMOUNT') return false;
     if(excludeIdx!==null && i===excludeIdx) return false;
+    if(fy && getFiscalYear(t.date)!==fy) return false;
     return t.bn && t.bn.trim() === bn.trim();
   });
   return txs;
@@ -5067,6 +5171,7 @@ function restoreFromFile(input){
       // Recalculate all balances to fix any legacy debit/credit issues
       Object.keys(DB).forEach(k=>recalcBalances(k));
       if(data.company) { COMPANY = data.company; localStorage.setItem('kkCompanyInfo', JSON.stringify(COMPANY)); updateHeader(); }
+      _dbLoadConfirmed = true; // ADDED — explicit user-initiated restore is a legitimate confirmed state
       saveDB();
       populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
       const msg = document.getElementById('backupMsg');
@@ -5111,16 +5216,27 @@ function startNextFiscalYear(){
     `Next: FY ${nextFY.replace('-','/')}${label ? '  ("'+label+'")' : ''}\n\n` +
     `This only moves the "current fiscal year" pointer forward.\n` +
     `No transactions or balances are touched — all history stays exactly ` +
-    `as-is, and FY ${currentFY.replace('-','/')} remains fully editable from Old Records.`
+    `as-is, and FY ${currentFY.replace('-','/')} remains fully editable from Old Records.\n\n` +
+    `Bill No. and Receipt No. will restart from 1 / RCP:1 for the new year ` +
+    `(opening balances still carry forward as usual).`
   );
   if(!ok) return;
 
   setCurrentFY(nextFY);
+  viewFY = null; // ADDED — snap the Dashboard/Ledger year selector back to "current" (the new FY)
   populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
   if(typeof populateArchiveFYPicker==='function') populateArchiveFYPicker();
+  // FISCAL YEAR SYSTEM: bill/receipt numbering is scoped to getCurrentFY()
+  // inside getNextBillNumber()/getNextReceiptNumber(), so refresh the
+  // Bill Entry / Receipt Entry hints (and clear any stale typed value)
+  // right away so they reflect the new year the moment it starts.
+  const beBillNoEl = document.getElementById('beBillNo');
+  if(beBillNoEl) beBillNoEl.value = '';
+  if(typeof updateNextBnHint==='function') updateNextBnHint();
+  if(typeof updateNextRcHint==='function') updateNextRcHint();
 
   if(fyMsg){
-    fyMsg.textContent = `✓ Now viewing FY ${nextFY.replace('-','/')}. All transaction history is unchanged and FY ${currentFY.replace('-','/')} is available under Old Records.`;
+    fyMsg.textContent = `✓ Now viewing FY ${nextFY.replace('-','/')}. All transaction history is unchanged and FY ${currentFY.replace('-','/')} is available under Old Records. Bill/Receipt numbering has restarted from 1 for the new year.`;
     fyMsg.style.color = 'var(--green)';
   }
   showToast(`✓ Started FY ${nextFY.replace('-','/')}`, 'green');
@@ -5417,7 +5533,7 @@ function renderDashboard(){
     html+=`<tr onclick="viewParty('${k}')">
       <td>${i+1}</td>
       <td><strong>${p.name}</strong> ${vBadge}${p.pan?'<br><span style="font-size:11px;color:var(--muted)">PAN: '+p.pan+'</span>':''}${p.phone?'<br><span style="font-size:11px;color:var(--muted)">📞 '+p.phone+'</span>':''}</td>
-      <td class="amt">${fmt((dateFilterFrom||dateFilterTo) ? p.opening_balance : getOpeningBalance(p, getCurrentFY()))}</td>
+      <td class="amt">${fmt((dateFilterFrom||dateFilterTo) ? p.opening_balance : getOpeningBalance(p, getViewFY()))}</td>
       <td class="amt" style="color:var(--red)">${fmt(dr)}</td>
       <td class="amt" style="color:var(--green)">${fmt(cr)}</td>
       <td class="amt ${bc}">${fmt(bal)}</td>
@@ -5430,6 +5546,7 @@ function renderDashboard(){
   });
   if(!html) html='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No parties found</td></tr>';
   document.getElementById('dashBody').innerHTML=html;
+  populateViewFYPicker('viewFYDash');
 }
 
 // ── PHASE 2: PARTY SEARCH AUTOCOMPLETE ──
@@ -5764,14 +5881,20 @@ function saveReceipt(){
   const particular = rcSelectedType;
   const fullNote = chequeDetail ? (note ? note+' | '+chequeDetail : chequeDetail) : note;
 
-  // Check duplicate receipt no GLOBALLY across all parties
+  // Check duplicate receipt no GLOBALLY across all parties — but only
+  // WITHIN the same fiscal year as this receipt's date. Receipt numbers
+  // restart each FY (see FISCAL YEAR SYSTEM / getNextReceiptNumber), so
+  // comparing against prior years here would wrongly block e.g. RCP:1
+  // every time a new year starts.
   const RC_TYPES = ['BY CASH','BY CHEQUE','BY TRANSPORT',
                     'BY GOODS RETURN','OTHER_CR'];
+  const rcFY = (typeof getFiscalYear==='function') ? getFiscalYear(date) : null;
   const globalDupes = [];
   Object.keys(DB).forEach(k=>{
     DB[k].transactions.forEach(t=>{
       const isRcEntry = t.isDebit === false ||
                         RC_TYPES.includes(t.particular);
+      if(rcFY && getFiscalYear(t.date)!==rcFY) return;
       if(isRcEntry && t.bn && t.bn.trim() === rcNo.trim()){
         globalDupes.push({
           partyName: DB[k].name,
@@ -5840,7 +5963,7 @@ function renderRcRegister(){
       const isReceipt = t.isDebit === false ||
                         RC_TYPES.includes(t.particular);
       if(!isReceipt) return;
-      if(getFiscalYear(t.date) !== getCurrentFY()) return; // FY SYSTEM: scope to current FY
+      if(getFiscalYear(t.date) !== getViewFY()) return; // FY SYSTEM: scope to viewed FY
       if(!t.bn) return;                        // must have receipt no
       if(typeFilter && t.particular !== typeFilter) return;
       const amt = safeNum(t.credit) || safeNum(t.amount) || 0;
@@ -5918,7 +6041,7 @@ function renderBillRegister(){
                      (t.isDebit !== false &&
                       !RC_TYPES.includes(t.particular));
       if(!isBill) return;
-      if(getFiscalYear(t.date) !== getCurrentFY()) return; // FY SYSTEM: scope to current FY
+      if(getFiscalYear(t.date) !== getViewFY()) return; // FY SYSTEM: scope to viewed FY
       if(!t.bn) return;                         // must have bill no
       if(typeFilter && t.particular !== typeFilter) return;
       const amt = safeNum(t.debit) || safeNum(t.amount) || 0;
@@ -6003,6 +6126,53 @@ function getAllFYCodesWithData(){
   const codes = [];
   for(let y=firstYear; y<=lastYear; y++) codes.push(y + '-' + String((y+1)%100).padStart(2,'0'));
   return codes;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FISCAL YEAR VIEW SELECTOR (Dashboard / Ledger / Registers)
+//  Lets the user pick which FY the Dashboard, Ledger List, Ledger
+//  Detail, Bill Register, and Receipt Register display — separate
+//  from the actual "current FY" pointer (getCurrentFY/setCurrentFY),
+//  which still only moves via "Start Next Fiscal Year" and still
+//  governs new-entry date defaults. Old Records/Archive keeps its
+//  own separate FY picker (archiveSelectedFY) and is unaffected.
+// ══════════════════════════════════════════════════════════════
+let viewFY = null; // null = "follow current FY"; otherwise an explicit FY code
+
+function getViewFY(){
+  return viewFY || getCurrentFY();
+}
+
+// Builds the option list for a "view FY" <select>: current FY first
+// (always offered, even with zero transactions yet), then every past
+// FY that actually has data, most recent first.
+function populateViewFYPicker(selectId){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  const currentFY = getCurrentFY();
+  const past = getAllFYCodesWithData().filter(c=>c!==currentFY).reverse();
+  const codes = currentFY ? [currentFY, ...past] : past;
+  sel.innerHTML = codes.map(c=>`<option value="${c}">FY ${c.replace('-','/')}${c===currentFY?' (current)':''}</option>`).join('');
+  sel.value = getViewFY();
+}
+
+// Called from either dropdown's onchange — keeps both selects in sync
+// (Dashboard's and Ledger's) and re-renders every FY-scoped view.
+function setViewFY(fyCode){
+  const currentFY = getCurrentFY();
+  viewFY = (!fyCode || fyCode===currentFY) ? null : fyCode;
+  ['viewFYDash','viewFYLedger'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(sel) sel.value = getViewFY();
+  });
+  renderStats(); renderDashboard(); renderLedgerList();
+  renderBillRegister(); renderRcRegister();
+  // Only refresh the open ledger-detail view in place — viewParty() also
+  // calls showPage('ledger'), which would wrongly yank the user onto the
+  // Ledger page just for changing the Dashboard's year dropdown.
+  const ledgerDetailOpen = document.getElementById('ledgerDetail')?.style.display === 'block'
+    && document.getElementById('page-ledger')?.classList.contains('active');
+  if(currentParty && ledgerDetailOpen) viewParty(currentParty);
 }
 
 // Old Records = PAST years only. The current FY already lives on the
@@ -7301,10 +7471,16 @@ function getNextBillNumber(){
   const BILL_TYPES = ['TO GOODS','VAT BILL','CASH MEMO','OTHER'];
   const RC_TYPES   = ['BY CASH','BY CHEQUE','BY TRANSPORT',
                       'BY GOODS RETURN','OTHER_CR'];
+  // FISCAL YEAR SYSTEM: numbering restarts each fiscal year — only
+  // transactions dated inside the currently-open FY count toward the
+  // max. Older years' bill numbers are left untouched in history and
+  // simply ignored here, so a new FY always starts back at 1.
+  const fy = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
   let max = 0;
   Object.keys(DB).forEach(k=>{
     DB[k].transactions.forEach(t=>{
       if(!t.bn) return;
+      if(fy && typeof getFiscalYear==='function' && getFiscalYear(t.date)!==fy) return;
       // Must be a bill type — check particular first, then isDebit
       const isBill = BILL_TYPES.includes(t.particular) ||
                      (t.isDebit === true &&
@@ -7314,16 +7490,19 @@ function getNextBillNumber(){
       if(!isNaN(n) && n > max) max = n;
     });
   });
-  return max + 1;  // returns 1 when no data
+  return max + 1;  // returns 1 when no data in this FY yet
 }
 
 function getNextReceiptNumber(){
+  // FISCAL YEAR SYSTEM: same per-FY restart as getNextBillNumber() above.
+  const fy = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
   let max = 0;
   let detectedPrefix = 'RCP:';
   Object.keys(DB).forEach(k=>{
     DB[k].transactions.forEach(t=>{
       if(t.isDebit === true) return;
       if(!t.bn) return;
+      if(fy && typeof getFiscalYear==='function' && getFiscalYear(t.date)!==fy) return;
       const trimmed = String(t.bn).trim();
       const n = extractNumber(trimmed);
       if(isNaN(n) || n <= 0) return;
@@ -7337,7 +7516,7 @@ function getNextReceiptNumber(){
     });
   });
   const next = max + 1;
-  // If no receipts exist yet → start with RCP:1
+  // If no receipts exist yet this FY → start with RCP:1
   return detectedPrefix + next;
 }
 
