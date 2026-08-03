@@ -527,6 +527,22 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
 .bill-log-table tr:last-child td{border-bottom:none;}
 .bill-log-table tr:nth-child(even) td{background:var(--row-even);}
 
+/* CHEQUE BOOK (Phase 2) — additive, mirrors .bill-row / .bill-log-table sizing */
+.cb-row{display:grid;grid-template-columns:140px 130px 1fr 90px 70px;gap:10px;align-items:center;margin-bottom:8px;}
+.cb-row-header{display:grid;grid-template-columns:140px 130px 1fr 90px 70px;gap:10px;margin-bottom:6px;}
+.cb-row-header span{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.cb-status-btn{padding:3px 10px;border-radius:12px;border:1.5px solid var(--border);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.2s;}
+.cb-status-due{background:#fdeaea;color:var(--red);border-color:#e57373;}
+.cb-status-paid{background:#e8f5ec;color:var(--green);border-color:#81c784;}
+/* Due-reminder highlight — visual only, no popup (Phase 3 adds notifications) */
+.cb-due-row td{background:#fdecea!important;}
+[data-theme="dark"] .cb-due-row td{background:#4a1f1a!important;}
+/* CHEQUE BOOK (Phase 3) — notification permission UI, additive */
+.cb-notif-btn{padding:4px 12px;border-radius:12px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.2s;}
+.cb-notif-btn:hover{background:var(--accent);color:#fff;}
+.cb-notif-note{font-size:11px;color:var(--muted);}
+.cb-notif-note.granted{color:var(--green);}
+
 /* ── GAP CHECKER ── */
 .gap-report-box{background:var(--card);border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);border:1px solid var(--border);max-width:860px;}
 .gap-filter-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end;}
@@ -649,11 +665,14 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
 
   /* Bill entry row — stack vertically on mobile */
   .bill-row,
-  .bill-row-header{
+  .bill-row-header,
+  .cb-row,
+  .cb-row-header{
     grid-template-columns:1fr;
     gap:8px;
   }
-  .bill-row-header{display:none;} /* headers implicit via placeholders */
+  .bill-row-header,
+  .cb-row-header{display:none;} /* headers implicit via placeholders */
 
   /* Cards — slightly reduced padding for small screens */
   .entry-card,
@@ -1905,6 +1924,7 @@ body {
       <button class="nav-btn" onclick="showPage('receipt');closeHamburger()">🧾 Receipt</button>
       <button class="nav-btn" onclick="showPage('rcregister');closeHamburger()">🗂️ Receipt Register</button>
       <button class="nav-btn" onclick="showPage('archive');closeHamburger()">🗄️ Old Records</button>
+      <button class="nav-btn" onclick="showPage('chequebook');closeHamburger()">💳 Cheque Book<span class="bill-log-count" id="cbDueBadge" style="display:none"></span></button>
       <div class="global-search-wrap" id="globalSearchWrap" style="flex:0 1 180px;min-width:110px;">
         <input type="text" id="globalSearchInput" class="global-search-input" placeholder="🔍 Search party..." autocomplete="off" oninput="globalSearchInput()" onkeydown="globalSearchKey(event)" style="font-size:11px;padding:4px 11px;">
         <div class="global-search-drop" id="globalSearchDrop"></div>
@@ -2472,6 +2492,100 @@ body {
       </div>
       <div id="gapResults"></div>
     </div>
+
+    <!-- ══════════════════════════════════════════════
+         BEST PARTIES — read-only analytics, added to Reports.
+         Nothing here is stored or synced to Firebase; every number
+         is recomputed live from each party's existing transactions
+         whenever this section is viewed or the period changes —
+         same "always live, never persisted" principle the fiscal-
+         year system already uses for opening balances. Its FY
+         picker (#bpViewFY / _bpViewFY below) is its own independent
+         state, mirroring the Cheque Book's #viewFYChequebook /
+         _cbViewFY pattern — it never reads or writes the shared
+         viewFY that Dashboard/Ledger use, or Cheque Book's own.
+
+         SCORING (plain-English):
+         For each party, over the selected period's transactions —
+           • Sales Volume  = total billed (sum of debit)
+           • Reliability   = total paid back ÷ total billed, capped
+                              at 100% (so an advance/overpayment can't
+                              push a party above a perfect score)
+           • Activity      = number of distinct calendar months (BS)
+                              that had at least one transaction — a
+                              steadiness signal, not a raw transaction
+                              count, so a single busy week doesn't
+                              outrank a party who does business with
+                              you every month
+         Each of the three is scaled to 0-100: Sales Volume and
+         Activity relative to whichever active party scored highest
+         on that metric this period; Reliability is already a 0-1
+         ratio so it's just ×100 directly (paying back 100% always
+         scores 100, not just "best of a weak field"). The Combined
+         Score is a plain average of the three. Parties with zero
+         transactions in the selected period are left off the list
+         entirely — inactive parties aren't ranked.
+         ══════════════════════════════════════════════ -->
+    <div class="gap-report-box" style="margin-top:24px">
+      <div class="page-title" style="font-size:18px;margin-bottom:10px">🏆 Best Parties</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Ranks parties by a combined score across <strong>sales volume</strong>, <strong>payment reliability</strong>, and <strong>monthly activity</strong> — recalculated live every time this section is viewed.</p>
+      <div class="gap-filter-bar">
+        <label>Period
+          <select id="bpViewFY" onchange="setBpViewFY(this.value)" style="padding:8px 11px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--row-even);outline:none;color:var(--text);min-width:170px"></select>
+        </label>
+      </div>
+      <div id="bpEmptyMsg" style="display:none;text-align:center;color:var(--muted);padding:30px;font-size:13px"></div>
+      <div style="overflow-x:auto">
+      <table class="party-table" id="bpTable" style="display:none">
+        <thead><tr>
+          <th>Rank</th><th>Party Name</th><th>Score</th><th>Sales Volume</th><th>Reliability</th><th>Active Months</th>
+        </tr></thead>
+        <tbody id="bpTableBody"></tbody>
+      </table>
+      </div>
+      <div id="bpShowAllWrap" style="text-align:center;margin-top:12px;display:none">
+        <a href="#" onclick="toggleBpShowAll();return false;" id="bpShowAllLink" style="font-size:13px;color:var(--blue);font-weight:600;text-decoration:none">Show all →</a>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         MONTHLY AWARD — additive, on top of Best Parties above.
+         Unlike Best Parties (pure read-only, nothing stored), this
+         DOES persist: recording an award writes a snapshot of that
+         month's #1 party + their score/metrics at that moment to
+         Firebase (/kkledger/awards) + a localStorage cache, mirroring
+         the Cheque Book's Phase 1 data layer exactly (Firebase-first-
+         if-online, local cache fallback, per-key PUT/DELETE — see the
+         "MONTHLY AWARD — Data Layer" comment near the end of the file
+         for the storage shape). The snapshot is deliberate: a party's
+         all-time numbers keep moving as new transactions come in, but
+         once a month's award is recorded, that record's score/sales/
+         reliability/activeMonths never silently change with them —
+         only "Re-record" explicitly overwrites it with a fresh
+         computation. Ranking reuses computeBestPartiesForTxFilter()
+         from Best Parties above, just scoped to one calendar month
+         instead of an FY/All-time — same formula, no duplication.
+         ══════════════════════════════════════════════ -->
+    <div class="gap-report-box" style="margin-top:24px">
+      <div class="page-title" style="font-size:18px;margin-bottom:10px">🏅 Monthly Award</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Records which party ranked #1 for a given calendar month, using the same combined-score formula as Best Parties above.</p>
+      <div class="gap-filter-bar">
+        <label>Month
+          <select id="maMonthPicker" onchange="setMaMonth(this.value)" style="padding:8px 11px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--row-even);outline:none;color:var(--text);min-width:170px"></select>
+        </label>
+      </div>
+      <div id="maContent" style="margin-top:6px"></div>
+      <div style="margin-top:22px">
+        <div class="page-title" style="font-size:15px;margin-bottom:8px">Award History</div>
+        <div id="maHistoryEmptyMsg" style="display:none;text-align:center;color:var(--muted);padding:20px;font-size:13px"></div>
+        <div style="overflow-x:auto">
+        <table class="party-table" id="maHistoryTable" style="display:none">
+          <thead><tr><th>Month</th><th>Party</th><th>Score</th><th>Date Awarded</th></tr></thead>
+          <tbody id="maHistoryBody"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- OLD RECORDS / ARCHIVE PAGE — FISCAL YEAR SYSTEM (Phase 2) -->
@@ -2529,6 +2643,68 @@ body {
         </tr></thead>
         <tbody id="archiveDetailBody"></tbody>
       </table>
+      </div>
+    </div>
+  </div>
+
+<!-- CHEQUE BOOK PAGE (Phase 2 of 3) — see the "CHEQUE BOOK — Phase 1/2"
+     script block near the end of the file for the data layer + JS
+     wiring behind this page. No reminder popup here — Phase 3 only. -->
+  <div class="page" id="page-chequebook">
+    <div class="page-title">💳 Cheque Book</div>
+    <div class="bill-entry-card">
+      <div class="enter-hint">💡 Record a cheque you've issued, then mark it Paid once it clears. Rows in amber are due for a reminder (1 day before the cheque date) and still unpaid.</div>
+      <!-- NOTIFICATION PERMISSION UI (Phase 3) — filled in by renderCbNotifPermUI() -->
+      <div id="cbNotifPermRow" style="margin-top:6px"></div>
+      <br>
+      <div class="cb-row-header">
+        <span>Date (BS) *</span>
+        <span>Cheque No. *</span>
+        <span>Payee's Name *</span>
+        <span>Amount (Rs.) *</span>
+        <span>Paisa</span>
+      </div>
+      <div class="cb-row" id="cbEntryRow">
+        <div class="bs-date-wrapper">
+          <input type="text" class="bill-input" id="cbDate" placeholder="2082-08-15" readonly onclick="toggleBsPicker('cbDate')" style="cursor:pointer;width:100%">
+        </div>
+        <input type="text" class="bill-input" id="cbChequeNo" placeholder="e.g. 001234" autocomplete="off">
+        <input type="text" class="bill-input" id="cbPayee" placeholder="Payee's name" autocomplete="off">
+        <input type="number" class="bill-input" id="cbAmountRs" placeholder="0" min="0" step="1">
+        <input type="number" class="bill-input" id="cbAmountPaisa" placeholder="00" min="0" max="99" step="1">
+      </div>
+      <div style="margin-top:6px">
+        <input type="text" class="bill-input" id="cbRemarks" placeholder="Remarks (optional)" style="width:100%">
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <button class="bill-save-btn" id="cbSaveBtn" onclick="saveCheque()">+ Save Cheque</button>
+      </div>
+      <!-- NEXT CHEQUE NO. HINT -->
+      <div class="be-next-bn-hint" id="cbNextChequeHint"></div>
+      <div class="bill-log" id="cbLogWrap">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+          <div class="bill-log-title" style="margin-bottom:0">All Cheques<span class="bill-log-count" id="cbLogCount" style="display:none"></span></div>
+          <select id="viewFYChequebook" onchange="setViewFYChequebook(this.value)" title="View a different fiscal year" style="max-width:180px"></select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <select id="cbStatusFilter" onchange="setCbStatusFilter(this.value)" title="Filter by status" style="max-width:130px">
+            <option value="due">Due</option>
+            <option value="paid">Paid</option>
+            <option value="all">All</option>
+          </select>
+          <select id="cbSortBy" onchange="setCbSortBy(this.value)" title="Sort the list" style="max-width:190px">
+            <option value="date_desc">Date (newest first)</option>
+            <option value="date_asc">Date (oldest first)</option>
+            <option value="chequeno_asc">Cheque No (ascending)</option>
+            <option value="chequeno_desc">Cheque No (descending)</option>
+          </select>
+        </div>
+        <table class="bill-log-table">
+          <thead><tr>
+            <th>Date</th><th>Cheque No.</th><th>Payee</th><th>Amount</th><th>Remarks</th><th>Status</th><th class="no-print"></th>
+          </tr></thead>
+          <tbody id="cbLogBody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -3624,6 +3800,15 @@ function doLogin(){
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
     initDB(); updateHeader(); populatePartyDropdown(); renderDashboard(); renderLedgerList(); renderStats();
+    // CHEQUE BOOK (Phase 2): load once at login, same as initDB() above,
+    // so the Cheque Book tab is populated without needing to click into
+    // it first. Fully separate store — does not touch DB/initDB().
+    if(typeof initChequebook === 'function') initChequebook();
+    // MONTHLY AWARD (additive): load award history once at login, same
+    // reasoning as initChequebook() above, so Award History is ready
+    // without needing to open Reports first. Fully separate store —
+    // does not touch DB/initDB() or the chequebook store.
+    if(typeof loadAwards === 'function') loadAwards();
     // Nudge user to change default password
     setTimeout(()=>{
       if(localStorage.getItem('kkPassword') === null){
@@ -5348,12 +5533,23 @@ function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const btns=['dashboard','billentry','billregister','ledger','reports','receipt','rcregister','archive'];
+  const btns=['dashboard','billentry','billregister','ledger','reports','receipt','rcregister','archive','chequebook'];
   const idx=btns.indexOf(name);
   if(idx>=0){ const nb=document.querySelectorAll('.nav-btn')[idx]; if(nb) nb.classList.add('active'); }
   if(name==='billregister'){
     renderBillRegister();
     window.scrollTo(0,0);
+  }
+  if(name==='reports'){
+    // BEST PARTIES (read-only analytics, additive) — refresh its own
+    // period picker + table each time Reports is opened, same as
+    // Archive's FY picker refresh just below. Does not touch the
+    // Gap Checker's own state/UI.
+    if(typeof populateBpFYPicker==='function') populateBpFYPicker();
+    if(typeof renderBestParties==='function') renderBestParties();
+    // MONTHLY AWARD (additive) — same refresh-on-open pattern.
+    if(typeof populateMaMonthPicker==='function') populateMaMonthPicker();
+    if(typeof renderMonthlyAward==='function') renderMonthlyAward();
   }
   if(name==='archive'){
     // FISCAL YEAR SYSTEM (Phase 2): Old Records page — FY picker + the
@@ -5427,6 +5623,20 @@ function showPage(name){
   }
   if(name==='rcregister'){
     renderRcRegister();
+    window.scrollTo(0,0);
+  }
+  // CHEQUE BOOK (Phase 2): default the date field to today's BS date
+  // (same source as beDate/rcDate above) and re-render the list every
+  // time the tab is opened, since it's also loaded once at startup.
+  if(name==='chequebook'){
+    const cbDateEl = document.getElementById('cbDate');
+    if(cbDateEl && !cbDateEl.value){
+      cbDateEl.value = lastEntryDate || BS_TODAY_APPROX || '';
+    }
+    if(typeof populateChequebookFYPicker === 'function') populateChequebookFYPicker(); // REFINEMENT
+    if(typeof syncCbFilterControls === 'function') syncCbFilterControls(); // DISPLAY PATCH
+    if(typeof renderChequebook === 'function') renderChequebook();
+    if(typeof updateNextChequeHint === 'function') updateNextChequeHint(); // REFINEMENT
     window.scrollTo(0,0);
   }
   // Scroll AFTER any pending layout — reliable on file:// too
@@ -7076,6 +7286,8 @@ if ('serviceWorker' in navigator) {
   const PARTY_ENTRY_FIELDS  = ['ePartySearch', 'eDate', 'eBN', '__PILLS__', 'eOtherLabel', 'eAmount', 'eNote'];
   // Bill Entry order per spec: Bill No → Party → Type → Amount → Date → Note → Save
   const BILL_ENTRY_FIELDS   = ['beBillNo', 'bePartySearch', 'beAmount', 'beDate', 'beNoteInput'];
+  // Cheque Book order per spec: Date → Cheque No → Payee → Amount Rs → Amount Paisa → Remarks → Save
+  const CHEQUE_ENTRY_FIELDS = ['cbDate', 'cbChequeNo', 'cbPayee', 'cbAmountRs', 'cbAmountPaisa', 'cbRemarks'];
 
   // ── Visibility helper — walks DOM to detect display:none ancestors ──
   function isVisible(el){
@@ -7309,6 +7521,32 @@ if ('serviceWorker' in navigator) {
         else { showToast('⚠ Fill Party, Receipt No, Date and Amount', 'red'); }
         return;
       }
+    }
+
+    // ── Cheque Book form ────────────────────────────────────────
+    const cbPage = document.getElementById('page-chequebook');
+    if(cbPage && cbPage.contains(active)){
+      if(active.tagName === 'INPUT' && (active.disabled || active.type === 'hidden')) return;
+
+      // Date field: readonly (opens the BS picker on click, or is
+      // already default-filled by showPage()'s 'chequebook' branch) —
+      // nothing to validate here, just advance to Cheque No, same
+      // reasoning as rcNo→rcDate above.
+      if(active.id === 'cbDate'){
+        e.preventDefault();
+        document.getElementById('cbChequeNo').focus();
+        return;
+      }
+
+      const result = advanceFocus(active, CHEQUE_ENTRY_FIELDS);
+      if(result === false) return;
+      e.preventDefault();
+      if(result === 'last'){
+        // Last field (cbRemarks) — saveCheque() does its own required-
+        // field check and toast, so just call it directly.
+        saveCheque();
+      }
+      return;
     }
 
     // Any other context → do not intercept
@@ -7910,6 +8148,716 @@ function importFromExcel(input){
 </script>
 
 <!-- ══════════════════════════════════════════════
+     CHEQUE BOOK — Phase 1 of 3 (Data layer only, additive only)
+     A record of cheques issued — completely separate from the party
+     ledger DB. This is data-layer scaffolding only. Nothing else in
+     this block calls into it — it's used by the Phase 2 UI script
+     right below, and was also console-tested standalone.
+     Storage: Firebase path /kkledger/chequebook, an OBJECT keyed by
+     cheque id (NOT an array) — same reasoning as why the ledger DB is
+     keyed by party: partial per-record writes, no full-array rewrites.
+     localStorage cache key: kkChequebook. Sync pattern mirrors exactly
+     how /kkledger/meta/currentFY loads/saves below (Firebase-first-if-
+     online, fall back to local cache, write-through on save). This
+     does NOT touch the main DB object, DB save path, or the empty-DB
+     push guard logic that exists for the ledger — fully separate store.
+
+     CHEQUE BOOK — Phase 2 of 3 (DONE): nav tab + UI.
+     Added a "💳 Cheque Book" nav-btn and #page-chequebook (entry form +
+     list table) — see showPage()'s 'chequebook' branch for the page-
+     switch wiring, and the script block immediately below this comment
+     for saveCheque()/renderChequebook()/toggleChequeStatus()/
+     removeCheque(), which are the only new callers of the Phase 1
+     functions above. loadChequebook() is now also called once at
+     login (see doLogin()), same as initDB(), so the list is populated
+     without needing to click into the tab first. Rows past their
+     reminder date and still "due" get an amber highlight (.cb-due-row)
+     — CSS only, no popup/Notification API. Phase 3 will add the
+     reminder badge + browser notifications on top of this UI.
+
+     CHEQUE BOOK — Phase 2 refinement pass (DONE): three additive
+     changes on top of the working Phase 2 UI above, no restructuring:
+       1. getNextChequeNumber()/updateNextChequeHint() — auto-suggests
+          #cbChequeNo (highest purely-numeric chequeNo across all
+          recorded cheques, +1) on tab open and after each save, same
+          pattern as Bill Entry's updateNextBnHint(). Field stays fully
+          editable and the suggestion is never validated against.
+       2. Enter-key field-to-field chain (Date → Cheque No → Payee →
+          Amount Rs → Amount Paisa → Remarks → save) added to the
+          existing delegated document keydown listener (CHEQUE_ENTRY_
+          FIELDS + advanceFocus()), same mechanism Bill Entry/Receipt
+          Entry already use. cbDate is readonly/picker like Bill
+          Entry's own date field is NOT, so Enter on cbDate just
+          advances rather than validating a typed value.
+       3. #viewFYChequebook — a cheque-book-only FY picker (own
+          _cbViewFY/getViewFYChequebook() state, entirely separate from
+          the shared viewFY/getViewFY() Dashboard and Ledger use).
+          renderChequebook() now filters the list to the selected FY
+          before sorting; the reminder highlight is untouched by this,
+          since it only depends on each cheque's own date/status.
+
+     CHEQUE BOOK — display patch (DONE): status filter + sort control,
+     display-only, no data-layer changes. #cbStatusFilter (Due/Paid/All,
+     default Due) and #cbSortBy (Date newest/oldest, Cheque No asc/desc)
+     sit next to #viewFYChequebook. renderChequebook() now applies
+     FY scope → status filter → sort, in that order, before rendering.
+     Both controls use the same in-memory-only persistence as _cbViewFY
+     (_cbStatusFilter/_cbSortBy, synced to the <select>s via
+     syncCbFilterControls() on tab open) — no localStorage, holds for
+     the session. Cheque No sort uses cbCompareChequeNo(): numeric
+     compare when purely numeric, plain string compare otherwise, so
+     mixed/prefixed cheque numbers never crash or misorder. Neither
+     control touches _cbCache/CHEQUEBOOK, the reminder highlight, or
+     the nav badge (#cbDueBadge) — that's still driven straight off
+     getDueReminders(), unfiltered, exactly as before.
+     ══════════════════════════════════════════════ -->
+<script>
+(function(){
+
+  const CB_LOCAL_KEY = 'kkChequebook';
+  const FB_CB_PATH    = '/kkledger/chequebook';       // base, no .json (per-id writes append it)
+  const FB_CB_ALL_PATH = '/kkledger/chequebook.json'; // whole-object reads
+
+  // In-memory store — object keyed by cheque id, mirrors the Firebase shape.
+  let CHEQUEBOOK = {};
+  try {
+    const cached = localStorage.getItem(CB_LOCAL_KEY);
+    if(cached) CHEQUEBOOK = JSON.parse(cached) || {};
+  } catch(e){ CHEQUEBOOK = {}; }
+
+  function _saveLocalCB(){
+    try{ localStorage.setItem(CB_LOCAL_KEY, JSON.stringify(CHEQUEBOOK)); }catch(e){}
+  }
+
+  // ── loadChequebook() ──
+  // Firebase-first-if-online, fall back to local cache — same pattern
+  // as loadCurrentFY() below. Populates CHEQUEBOOK and returns it.
+  async function loadChequebook(){
+    if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
+      try{
+        const resp = await fetch(withAuth(FIREBASE_URL + FB_CB_ALL_PATH + '?t=' + Date.now()));
+        if(resp.ok){
+          const val = await resp.json();
+          if(val && typeof val === 'object'){
+            CHEQUEBOOK = val;
+            _saveLocalCB();
+          }
+        }
+      }catch(e){
+        console.warn('[KK] Could not load chequebook from Firebase, using local cache:', e);
+      }
+    }
+    // Otherwise: whatever was read from localStorage at declaration time stands.
+    return CHEQUEBOOK;
+  }
+
+  // ── addCheque(cheque) ──
+  // Generates an id, saves locally + pushes to Firebase (per-id PUT,
+  // same as pushPartyToFirebase() does for a single DB[key]).
+  async function addCheque(cheque){
+    const id = 'chq_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6);
+    const record = Object.assign({
+      id: id,
+      date: '',
+      chequeNo: '',
+      payee: '',
+      amountRs: 0,
+      amountPaisa: 0,
+      remarks: '',
+      status: 'due',
+      createdAt: Date.now()
+    }, cheque, { id: id }); // id always wins — never let a passed-in id override the generated one
+
+    CHEQUEBOOK[id] = record;
+    _saveLocalCB();
+
+    if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
+      try{
+        const resp = await fetch(withAuth(FIREBASE_URL + FB_CB_PATH + '/' + encodeURIComponent(id) + '.json'), {
+          method: 'PUT',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(record)
+        });
+        if(!resp.ok) console.warn('[KK] Cheque push failed:', resp.status);
+      }catch(e){
+        console.warn('[KK] Cheque push failed, saved locally only:', e);
+      }
+    }
+    return record;
+  }
+
+  // ── updateCheque(id, patch) ──
+  // Partial update (e.g. just status) — same save pattern as addCheque.
+  async function updateCheque(id, patch){
+    if(!CHEQUEBOOK[id]){
+      console.warn('[KK] updateCheque: no cheque with id', id);
+      return null;
+    }
+    const record = Object.assign({}, CHEQUEBOOK[id], patch, { id: id });
+    CHEQUEBOOK[id] = record;
+    _saveLocalCB();
+
+    if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
+      try{
+        const resp = await fetch(withAuth(FIREBASE_URL + FB_CB_PATH + '/' + encodeURIComponent(id) + '.json'), {
+          method: 'PUT',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(record)
+        });
+        if(!resp.ok) console.warn('[KK] Cheque update push failed:', resp.status);
+      }catch(e){
+        console.warn('[KK] Cheque update push failed, saved locally only:', e);
+      }
+    }
+    return record;
+  }
+
+  // ── deleteCheque(id) ──
+  async function deleteCheque(id){
+    if(!CHEQUEBOOK[id]) return false;
+    delete CHEQUEBOOK[id];
+    _saveLocalCB();
+
+    if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
+      try{
+        const resp = await fetch(withAuth(FIREBASE_URL + FB_CB_PATH + '/' + encodeURIComponent(id) + '.json'), {
+          method: 'DELETE'
+        });
+        if(!resp.ok) console.warn('[KK] Cheque delete push failed:', resp.status);
+      }catch(e){
+        console.warn('[KK] Cheque delete push failed, removed locally only:', e);
+      }
+    }
+    return true;
+  }
+
+  // ── getReminderDate(bsDateStr) ──
+  // Returns the BS date string exactly 1 day before bsDateStr, using
+  // getBSDays() for correct month lengths (never hardcoded 30/31/32).
+  function getReminderDate(bsDateStr){
+    if(!bsDateStr) return null;
+    const m = String(bsDateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m) return null;
+    let y = parseInt(m[1],10), mo = parseInt(m[2],10), d = parseInt(m[3],10);
+
+    d -= 1;
+    if(d < 1){
+      mo -= 1;
+      if(mo < 1){ mo = 12; y -= 1; }
+      d = (typeof getBSDays === 'function') ? getBSDays(y, mo) : 30;
+    }
+    return y + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+  }
+
+  // ── getDueReminders() ──
+  // All cheques where status is "due" AND getReminderDate(cheque.date)
+  // <= today's BS date. Reuses BS_TODAY_APPROX / adToBsApprox() — the
+  // same "today in BS" source the fiscal-year block below uses — so
+  // there's exactly one place in the app that decides what "today" is.
+  // BS date strings are zero-padded "YYYY-MM-DD", so plain string
+  // comparison is safe (matches lexical == chronological order).
+  function getDueReminders(){
+    const todayBs = (typeof BS_TODAY_APPROX !== 'undefined' && BS_TODAY_APPROX)
+      ? BS_TODAY_APPROX
+      : (typeof adToBsApprox === 'function' ? adToBsApprox() : null);
+    if(!todayBs) return [];
+
+    return Object.values(CHEQUEBOOK).filter(function(cheque){
+      if(!cheque || cheque.status !== 'due') return false;
+      const reminderDate = getReminderDate(cheque.date);
+      return reminderDate && reminderDate <= todayBs;
+    });
+  }
+
+  // Exposed globally — the Phase 2 UI script right below is now the
+  // caller. Phase 3 wires up the reminder badge + browser notifications
+  // on top of getDueReminders().
+  window.loadChequebook  = loadChequebook;
+  window.addCheque       = addCheque;
+  window.updateCheque    = updateCheque;
+  window.deleteCheque    = deleteCheque;
+  window.getReminderDate = getReminderDate;
+  window.getDueReminders = getDueReminders;
+
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════
+     CHEQUE BOOK — Phase 2 of 3: UI wiring (nav tab + page)
+     Reads/writes exclusively through the Phase 1 functions exposed
+     above (loadChequebook/addCheque/updateCheque/deleteCheque/
+     getReminderDate). Keeps its own render-cache (_cbCache) so the
+     table doesn't refetch from Firebase on every toggle/delete — each
+     Phase 1 call already returns the affected record, which is applied
+     to _cbCache before re-rendering. No Notification API / popup logic
+     here — the amber row highlight below is CSS only. Phase 3 will add
+     the reminder badge + browser notifications on top of this UI.
+     ══════════════════════════════════════════════ -->
+<script>
+(function(){
+
+  let _cbCache = {}; // mirrors the Phase 1 chequebook object, for rendering only
+
+  // ── Cheque Book FY scope (REFINEMENT) ──
+  // Own independent "which FY is being viewed" state — deliberately
+  // NOT the same viewFY/getViewFY() that Dashboard/Ledger share, so
+  // picking a year here never affects (and is never affected by)
+  // what those pages show. null = "follow current FY", same
+  // null-means-current convention as the shared viewFY.
+  let _cbViewFY = null;
+
+  function getViewFYChequebook(){
+    return _cbViewFY || (typeof getCurrentFY==='function' ? getCurrentFY() : null);
+  }
+
+  // Every FY code that has at least one cheque, earliest→latest —
+  // derived from actual cheque dates (mirrors getAllFYCodesWithData()'s
+  // approach but scoped to cheque data, since a cheque can exist in a
+  // year with no party-ledger transactions at all).
+  function getAllChequeFYCodes(){
+    let minDate = null, maxDate = null;
+    Object.values(_cbCache).forEach(function(c){
+      if(!c || !c.date) return;
+      if(!minDate || c.date < minDate) minDate = c.date;
+      if(!maxDate || c.date > maxDate) maxDate = c.date;
+    });
+    if(!minDate || !maxDate || typeof getFiscalYear !== 'function') return [];
+    const firstYear = parseInt(getFiscalYear(minDate).split('-')[0],10);
+    const lastYear  = parseInt(getFiscalYear(maxDate).split('-')[0],10);
+    const codes = [];
+    for(let y=firstYear; y<=lastYear; y++) codes.push(y + '-' + String((y+1)%100).padStart(2,'0'));
+    return codes;
+  }
+
+  // Builds #viewFYChequebook's option list — current FY first (always
+  // offered), then past FYs that actually have a cheque, most recent
+  // first. Same shape as populateViewFYPicker() but reads/writes the
+  // independent _cbViewFY state above instead of the shared viewFY.
+  function populateChequebookFYPicker(){
+    const sel = document.getElementById('viewFYChequebook');
+    if(!sel) return;
+    const currentFY = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
+    const past = getAllChequeFYCodes().filter(c=>c!==currentFY).reverse();
+    const codes = currentFY ? [currentFY, ...past] : past;
+    sel.innerHTML = codes.map(c=>'<option value="'+c+'">FY '+c.replace('-','/')+(c===currentFY?' (current)':'')+'</option>').join('');
+    sel.value = getViewFYChequebook();
+  }
+
+  // Called from #viewFYChequebook's onchange — independent of setViewFY().
+  window.setViewFYChequebook = function(fyCode){
+    const currentFY = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
+    _cbViewFY = (!fyCode || fyCode===currentFY) ? null : fyCode;
+    renderChequebook();
+  };
+
+  // ── Cheque Book status filter + sort (DISPLAY PATCH) ──
+  // In-memory-only state, same lightweight persistence approach as
+  // _cbViewFY above — holds its value for the rest of the session so
+  // reopening the tab doesn't silently reset it, but doesn't need
+  // localStorage. Applied together with the FY scope (AND, not OR) and
+  // never touches _cbCache/CHEQUEBOOK itself — display-only.
+  let _cbStatusFilter = 'due'; // 'due' | 'paid' | 'all' — default matches the brief
+  let _cbSortBy = 'date_desc'; // 'date_desc' | 'date_asc' | 'chequeno_asc' | 'chequeno_desc'
+
+  window.setCbStatusFilter = function(v){
+    _cbStatusFilter = v || 'due';
+    renderChequebook();
+  };
+  window.setCbSortBy = function(v){
+    _cbSortBy = v || 'date_desc';
+    renderChequebook();
+  };
+
+  // Keeps #cbStatusFilter/#cbSortBy showing the in-memory state — same
+  // reasoning as populateChequebookFYPicker() setting sel.value from
+  // getViewFYChequebook() — called on tab open so the controls never
+  // silently drift from what's actually being applied.
+  function syncCbFilterControls(){
+    const statusSel = document.getElementById('cbStatusFilter');
+    if(statusSel) statusSel.value = _cbStatusFilter;
+    const sortSel = document.getElementById('cbSortBy');
+    if(sortSel) sortSel.value = _cbSortBy;
+  }
+  window.syncCbFilterControls = syncCbFilterControls;
+
+  // Cheque No comparator for the two "Cheque No" sort options — numeric
+  // compare when purely numeric (parseInt), plain string compare as the
+  // fallback so mixed/prefixed cheque numbers never crash or misorder.
+  function cbCompareChequeNo(a, b){
+    const aStr = String(a.chequeNo||'').trim();
+    const bStr = String(b.chequeNo||'').trim();
+    const aNum = /^\d+$/.test(aStr) ? parseInt(aStr,10) : NaN;
+    const bNum = /^\d+$/.test(bStr) ? parseInt(bStr,10) : NaN;
+    if(!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+    return aStr.localeCompare(bStr);
+  }
+
+  // ── getNextChequeNumber() (REFINEMENT) ──
+  // Mirrors getNextBillNumber()'s shape: highest purely-numeric
+  // chequeNo across all recorded cheques (via the Phase 1 _cbCache
+  // above — no new store), +1. Not FY-scoped (a physical cheque book's
+  // number range has nothing to do with fiscal years) and never
+  // validated against on save — convenience default only.
+  function getNextChequeNumber(){
+    let max = 0;
+    Object.values(_cbCache).forEach(function(c){
+      if(!c || !c.chequeNo) return;
+      const trimmed = String(c.chequeNo).trim();
+      if(!/^\d+$/.test(trimmed)) return; // only purely-numeric cheque numbers count
+      const n = parseInt(trimmed, 10);
+      if(n > max) max = n;
+    });
+    return max + 1; // starts at 1 when none exist
+  }
+
+  // Auto-fills #cbChequeNo when empty (tab open / freshly reset after
+  // save) and updates the hint line below it — same pattern as
+  // updateNextBnHint() for Bill Entry. Field stays fully editable;
+  // this is a default only, never enforced.
+  function updateNextChequeHint(){
+    const hint = document.getElementById('cbNextChequeHint');
+    const noInput = document.getElementById('cbChequeNo');
+    const next = getNextChequeNumber();
+    const last = next - 1;
+
+    if(noInput && !noInput.value){
+      noInput.value = String(next);
+    }
+
+    if(hint){
+      hint.textContent = last > 0
+        ? '💡 Last cheque: ' + last + '  —  Next: ' + next
+        : '💡 No cheques yet — starting from: ' + next;
+      hint.style.display = 'block';
+    }
+  }
+  window.updateNextChequeHint = updateNextChequeHint;
+  window.populateChequebookFYPicker = populateChequebookFYPicker;
+
+  function cbFmtAmount(rs, paisa){
+    const rsNum = Number(rs||0);
+    const psNum = Math.min(99, Math.max(0, Number(paisa||0)));
+    return 'Rs. ' + rsNum.toLocaleString('en-IN') + '.' + String(psNum).padStart(2,'0');
+  }
+
+  // Minimal HTML-escape for user-entered text fields (payee/remarks/chequeNo)
+  function cbEsc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, function(ch){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+    });
+  }
+
+  // ── renderChequebook() ──
+  // Renders #cbLogBody from _cbCache — FY scope → status filter → sort,
+  // in that order, before rendering rows. Rows past their reminder date
+  // and still "due" get .cb-due-row — visual highlight only, no popup
+  // (see block comment above). Filtering/sorting is display-only: it
+  // never touches _cbCache/CHEQUEBOOK, and the nav badge (#cbDueBadge)
+  // is computed straight from getDueReminders() elsewhere, so it is
+  // never affected by either control here.
+  window.renderChequebook = function(){
+    const body = document.getElementById('cbLogBody');
+    if(!body) return; // page not in DOM yet — nothing to render into
+
+    // FY SCOPE (REFINEMENT): filter to the cheque-book's own FY picker
+    // before sorting — independent of Dashboard/Ledger's viewFY. The
+    // reminder amber-highlight below is unaffected: it only looks at
+    // each cheque's own date/status, never which FY is being viewed.
+    const scopeFY = getViewFYChequebook();
+    let list = Object.values(_cbCache)
+      .filter(function(c){
+        return !scopeFY || (typeof getFiscalYear !== 'function') || getFiscalYear(c.date) === scopeFY;
+      });
+
+    // STATUS FILTER (DISPLAY PATCH): applied AND-together with the FY
+    // scope above, independent of it.
+    if(_cbStatusFilter === 'due'){
+      list = list.filter(function(c){ return c.status === 'due'; });
+    } else if(_cbStatusFilter === 'paid'){
+      list = list.filter(function(c){ return c.status === 'paid'; });
+    } // 'all' → no filter
+
+    // SORT (DISPLAY PATCH): default 'date_desc' matches the prior
+    // (only) behavior.
+    if(_cbSortBy === 'date_asc'){
+      list.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+    } else if(_cbSortBy === 'chequeno_asc'){
+      list.sort(cbCompareChequeNo);
+    } else if(_cbSortBy === 'chequeno_desc'){
+      list.sort(function(a,b){ return cbCompareChequeNo(b,a); });
+    } else { // 'date_desc' (default)
+      list.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    }
+
+    const countEl = document.getElementById('cbLogCount');
+    if(countEl){
+      if(list.length){ countEl.textContent = ' (' + list.length + ')'; countEl.style.display=''; }
+      else { countEl.style.display='none'; }
+    }
+
+    if(!list.length){
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No cheques recorded yet.</td></tr>';
+      return;
+    }
+
+    const todayBs = (typeof BS_TODAY_APPROX !== 'undefined' && BS_TODAY_APPROX)
+      ? BS_TODAY_APPROX
+      : (typeof adToBsApprox === 'function' ? adToBsApprox() : null);
+
+    let html = '';
+    list.forEach(function(c){
+      const isDue = c.status === 'due';
+      const reminderDate = (typeof getReminderDate === 'function') ? getReminderDate(c.date) : null;
+      const isReminderDue = isDue && reminderDate && todayBs && reminderDate <= todayBs;
+      const rowClass = isReminderDue ? ' class="cb-due-row"' : '';
+      const statusBtnClass = isDue ? 'cb-status-due' : 'cb-status-paid';
+      const statusLabel = isDue ? '⏳ Due' : '✅ Paid';
+      html += '<tr'+rowClass+'>'
+        + '<td>' + cbEsc(c.date) + '</td>'
+        + '<td>' + cbEsc(c.chequeNo) + '</td>'
+        + '<td>' + cbEsc(c.payee) + '</td>'
+        + '<td>' + cbFmtAmount(c.amountRs, c.amountPaisa) + '</td>'
+        + '<td>' + cbEsc(c.remarks) + '</td>'
+        + '<td><button class="cb-status-btn ' + statusBtnClass + '" onclick="toggleChequeStatus(\'' + c.id + '\')">' + statusLabel + '</button></td>'
+        + '<td class="no-print"><button class="del-btn" onclick="removeCheque(\'' + c.id + '\')">✕</button></td>'
+        + '</tr>';
+    });
+    body.innerHTML = html;
+  };
+
+  // ── saveCheque() ──
+  // Reads the entry form, validates, calls addCheque(), clears the
+  // form, and re-renders the list. Required: date, cheque no, payee,
+  // amountRs (>0). amountPaisa optional, defaults to 0, capped 0-99.
+  window.saveCheque = async function(){
+    const date     = (document.getElementById('cbDate').value||'').trim();
+    const chequeNo = (document.getElementById('cbChequeNo').value||'').trim();
+    const payee    = (document.getElementById('cbPayee').value||'').trim();
+    const rsVal    = document.getElementById('cbAmountRs').value;
+    const psVal    = document.getElementById('cbAmountPaisa').value;
+    const amountRs = parseFloat(rsVal) || 0;
+    let amountPaisa = parseInt(psVal, 10);
+    if(isNaN(amountPaisa)) amountPaisa = 0;
+    amountPaisa = Math.min(99, Math.max(0, amountPaisa));
+    const remarks  = (document.getElementById('cbRemarks').value||'').trim();
+
+    if(!date || !chequeNo || !payee || !(amountRs > 0)){
+      if(typeof showToast === 'function') showToast('⚠ Fill Date, Cheque No, Payee and Amount (Rs.)', 'red');
+      else alert('Fill Date, Cheque No, Payee and Amount (Rs.)');
+      return;
+    }
+
+    const btn = document.getElementById('cbSaveBtn');
+    if(btn) btn.disabled = true;
+    try{
+      const record = await addCheque({
+        date: date, chequeNo: chequeNo, payee: payee,
+        amountRs: amountRs, amountPaisa: amountPaisa,
+        remarks: remarks, status: 'due'
+      });
+      _cbCache[record.id] = record;
+
+      document.getElementById('cbChequeNo').value = '';
+      document.getElementById('cbPayee').value = '';
+      document.getElementById('cbAmountRs').value = '';
+      document.getElementById('cbAmountPaisa').value = '';
+      document.getElementById('cbRemarks').value = '';
+      // Date is deliberately left as-is — issuing several cheques on
+      // the same date is common, same reasoning as beDate/rcDate.
+
+      renderChequebook();
+      updateNextChequeHint(); // REFINEMENT: re-suggest the next cheque no.
+      if(typeof updateCbDueBadge === 'function') updateCbDueBadge(); // PHASE 3
+      if(typeof showToast === 'function') showToast('✅ Cheque saved', 'green');
+    } finally {
+      if(btn) btn.disabled = false;
+    }
+  };
+
+  // ── toggleChequeStatus(id) ── flips due↔paid, re-renders just the list
+  window.toggleChequeStatus = async function(id){
+    const current = _cbCache[id];
+    if(!current) return;
+    const newStatus = current.status === 'due' ? 'paid' : 'due';
+    const record = await updateCheque(id, { status: newStatus });
+    if(record) _cbCache[id] = record;
+    renderChequebook();
+    if(typeof updateCbDueBadge === 'function') updateCbDueBadge(); // PHASE 3
+  };
+
+  // ── removeCheque(id) ── confirm() then delete, same pattern as deleteTx()
+  window.removeCheque = async function(id){
+    const c = _cbCache[id];
+    const label = c ? (c.chequeNo + ' — ' + c.payee) : id;
+    if(!confirm('Delete cheque ' + label + '?\n\nThis cannot be undone.')) return;
+    await deleteCheque(id);
+    delete _cbCache[id];
+    renderChequebook();
+    if(typeof updateCbDueBadge === 'function') updateCbDueBadge(); // PHASE 3
+  };
+
+  // ── initChequebook() ──
+  // Called once at login (see doLogin(), mirrors initDB() being called
+  // there for the ledger DB) so the list is populated without needing
+  // to click into the tab first. Also called by showPage('chequebook')
+  // via renderChequebook() alone (cheap re-render, no refetch) each
+  // time the tab is opened.
+  window.initChequebook = async function(){
+    _cbCache = await loadChequebook();
+    renderChequebook();
+    // PHASE 3: badge always reflects ALL due reminders (getDueReminders()
+    // is not FY-scoped), and the very first reminder sweep of the
+    // session happens right after data is actually loaded.
+    if(typeof updateCbDueBadge === 'function') updateCbDueBadge();
+    if(typeof checkDueChequeReminders === 'function') checkDueChequeReminders();
+  };
+
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════
+     CHEQUE BOOK — Phase 3 of 3 (DONE): nav badge + browser
+     notifications, on top of Phase 1's getDueReminders() and Phase 2's
+     UI. Purely additive — reads Phase 1/2 state, adds nothing to the
+     data layer itself.
+       1. #cbDueBadge on the nav-btn — updateCbDueBadge() sets its text
+          to getDueReminders().length and hides it at 0. Deliberately
+          NOT wired to setViewFYChequebook() / the FY picker: it always
+          reflects every due reminder regardless of which FY the list
+          is scoped to (getDueReminders() itself takes no FY argument).
+          Refreshed after initChequebook() and after every save/toggle/
+          remove, since each of those changes what's "due".
+       2. #cbNotifPermRow — renderCbNotifPermUI() shows an "🔔 Enable
+          Reminders" button when Notification support exists and
+          permission isn't yet "granted"/"denied", a muted "already
+          granted" note when granted, and a muted "blocked in browser
+          settings" note when denied (no button that would silently
+          fail).
+       3. checkDueChequeReminders() — only fires when permission is
+          actually "granted". Dedupes per cheque per BS day via a
+          localStorage key ('kkChequeNotified:<id>:<todayBs>', same
+          BS_TODAY_APPROX/adToBsApprox() "today" source Phase 1's
+          getDueReminders() itself uses) so the same due cheque never
+          notifies twice in one day. Runs once right after
+          initChequebook() resolves, then on a 20-minute setInterval so
+          it also catches reminders that become due while the tab is
+          left open — no service worker / push infrastructure, matches
+          the "must work while a tab is open" requirement. Clicking a
+          fired notification jumps to the Cheque Book tab and degrades
+          silently on browsers that don't support that.
+     ══════════════════════════════════════════════ -->
+<script>
+(function(){
+
+  // ── updateCbDueBadge() ──
+  window.updateCbDueBadge = function(){
+    const badge = document.getElementById('cbDueBadge');
+    if(!badge) return;
+    const n = (typeof getDueReminders === 'function') ? getDueReminders().length : 0;
+    if(n > 0){
+      badge.textContent = String(n);
+      badge.style.display = '';
+    } else {
+      badge.textContent = '';
+      badge.style.display = 'none';
+    }
+  };
+
+  // ── renderCbNotifPermUI() ──
+  // Fills #cbNotifPermRow based on Notification support + current
+  // permission state. Re-run after the user responds to the prompt.
+  function renderCbNotifPermUI(){
+    const row = document.getElementById('cbNotifPermRow');
+    if(!row) return;
+
+    if(typeof Notification === 'undefined'){
+      row.innerHTML = ''; // no Notification API at all — say nothing, nothing to offer
+      return;
+    }
+
+    const perm = Notification.permission;
+    if(perm === 'granted'){
+      row.innerHTML = '<span class="cb-notif-note granted">🔔 Reminders enabled — you\'ll get a notification when a cheque is due for a balance check.</span>';
+    } else if(perm === 'denied'){
+      row.innerHTML = '<span class="cb-notif-note">🔕 Notifications blocked — enable them in your browser\'s site settings to get cheque reminders.</span>';
+    } else {
+      row.innerHTML = '<button type="button" class="cb-notif-btn" onclick="requestCbNotifPermission()">🔔 Enable Reminders</button>';
+    }
+  }
+  window.renderCbNotifPermUI = renderCbNotifPermUI;
+
+  // ── requestCbNotifPermission() ── button click handler
+  window.requestCbNotifPermission = function(){
+    if(typeof Notification === 'undefined') return;
+    Notification.requestPermission().then(function(perm){
+      renderCbNotifPermUI();
+      if(perm === 'granted' && typeof checkDueChequeReminders === 'function'){
+        checkDueChequeReminders(); // catch up immediately, don't wait for the interval
+      }
+    });
+  };
+
+  // ── checkDueChequeReminders() ──
+  // Fires a browser Notification for each due-and-unpaid cheque whose
+  // reminder date has arrived, once per cheque per BS day.
+  window.checkDueChequeReminders = function(){
+    if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    if(typeof getDueReminders !== 'function') return;
+
+    const todayBs = (typeof BS_TODAY_APPROX !== 'undefined' && BS_TODAY_APPROX)
+      ? BS_TODAY_APPROX
+      : (typeof adToBsApprox === 'function' ? adToBsApprox() : null);
+    if(!todayBs) return; // no reliable "today" — skip rather than mis-dedupe
+
+    getDueReminders().forEach(function(cheque){
+      const dedupeKey = 'kkChequeNotified:' + cheque.id + ':' + todayBs;
+      try{
+        if(localStorage.getItem(dedupeKey)) return; // already notified today
+      }catch(e){ return; } // localStorage unavailable — don't risk duplicate spam
+
+      let notif;
+      try{
+        // Wording accuracy: "is due tomorrow" is only true on the exact
+        // day the reminder fires. The periodic sweep can also catch a
+        // reminder that's a day (or more) overdue — e.g. the tab was
+        // closed over a weekend — so branch on getReminderDate() vs.
+        // todayBs rather than always saying "tomorrow".
+        const reminderMsg = (typeof getReminderDate === 'function' && getReminderDate(cheque.date) === todayBs)
+          ? 'is due tomorrow — make sure funds are in the account.'
+          : 'was due for a balance check — please verify funds are in the account.';
+        notif = new Notification('💳 Cheque due for a balance check', {
+          body: 'Cheque #' + cheque.chequeNo + ' to ' + cheque.payee +
+                ' (Rs. ' + Number(cheque.amountRs||0).toLocaleString('en-IN') +
+                ') ' + reminderMsg,
+          tag: dedupeKey
+        });
+      }catch(e){ return; }
+
+      try{ localStorage.setItem(dedupeKey, '1'); }catch(e){}
+
+      notif.onclick = function(){
+        try{
+          window.focus();
+          if(typeof showPage === 'function') showPage('chequebook');
+        }catch(e){}
+      };
+    });
+  };
+
+  // Periodic catch-up sweep — 20 minutes — so reminders that become
+  // due while the tab is left open still fire without a reload.
+  setInterval(function(){
+    if(typeof checkDueChequeReminders === 'function') checkDueChequeReminders();
+  }, 20 * 60 * 1000);
+
+  // Render the permission row as soon as this script runs — the page
+  // markup is already in the DOM even before login/tab-open.
+  renderCbNotifPermUI();
+
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════
      FISCAL YEAR SYSTEM — Phase 1 (Foundation, additive only)
      Nepali FY runs Shrawan 1 (BS month 04) through Ashad end
      (BS month 03 of the following year). Nothing is migrated —
@@ -8021,6 +8969,519 @@ function importFromExcel(input){
   window.getFYDateRange = getFYDateRange;
   window.getCurrentFY   = getCurrentFY;
   window.setCurrentFY   = setCurrentFY;
+
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════
+     REPORTS — Best Parties (read-only analytics, additive only)
+     Pure client-side ranking of parties across the selected period.
+     NO new Firebase paths, NO changes to DB or any save/sync logic —
+     everything below only READS the existing DB object and the
+     existing getCurrentFY() / getFYDateRange() / getFiscalYear() /
+     getFYTransactions() / getAllFYCodesWithData() helpers from the
+     Fiscal Year System, then throws its result away and recomputes
+     from scratch the next time this section is viewed or the period
+     changes. See the HTML comment above #page-reports' Best Parties
+     markup for the full scoring formula in plain terms.
+
+     REFACTOR (for Monthly Award, additive): the per-party metric +
+     normalization math that used to be inlined here now lives in
+     computeBestPartiesForTxFilter(txFilterFn) below, so the Monthly
+     Award feature can rank parties over a calendar month using the
+     exact same formula instead of a second copy of it. Output for
+     this table is unchanged — renderBestParties() just builds the
+     FY/All-time transaction filter and hands it to the shared function.
+     ══════════════════════════════════════════════ -->
+<script>
+(function(){
+
+  // ── Best Parties period scope ──
+  // Own independent "which period is being viewed" state — deliberately
+  // NOT the shared viewFY (Dashboard/Ledger) and NOT Cheque Book's
+  // _cbViewFY, so picking a period here never affects and is never
+  // affected by those. null = "follow current FY" (default). The
+  // string 'all' means "All-time" (every transaction, unfiltered).
+  let _bpViewFY = null;
+  let _bpShowAll = false; // "Show all" vs top-10, resets when period changes
+
+  function getBpViewFY(){
+    return _bpViewFY || (typeof getCurrentFY==='function' ? getCurrentFY() : null);
+  }
+
+  // Builds #bpViewFY's option list — current FY first (always offered),
+  // then every past FY that actually has party-ledger data, most
+  // recent first, then an "All-time" option last. Same shape as
+  // populateViewFYPicker()/populateChequebookFYPicker() but reads/
+  // writes the independent _bpViewFY state above.
+  window.populateBpFYPicker = function(){
+    const sel = document.getElementById('bpViewFY');
+    if(!sel) return;
+    const currentFY = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
+    const past = (typeof getAllFYCodesWithData==='function') ? getAllFYCodesWithData().filter(c=>c!==currentFY).reverse() : [];
+    const codes = currentFY ? [currentFY, ...past] : past;
+    let html = codes.map(c=>'<option value="'+c+'">FY '+c.replace('-','/')+(c===currentFY?' (current)':'')+'</option>').join('');
+    html += '<option value="all">All-time</option>';
+    sel.innerHTML = html;
+    sel.value = getBpViewFY();
+  };
+
+  // Called from #bpViewFY's onchange.
+  window.setBpViewFY = function(fyCode){
+    const currentFY = (typeof getCurrentFY==='function') ? getCurrentFY() : null;
+    _bpViewFY = (!fyCode || fyCode===currentFY) ? null : fyCode; // 'all' passes through unchanged
+    _bpShowAll = false;
+    renderBestParties();
+  };
+
+  window.toggleBpShowAll = function(){
+    _bpShowAll = !_bpShowAll;
+    renderBestParties();
+  };
+
+  // ── computeBestPartiesForTxFilter(txFilterFn) ──
+  // Shared scoring core, reused by both the FY/All-time table below
+  // AND the Monthly Award feature. txFilterFn(party) must return the
+  // array of transactions to score that party on for the period in
+  // question (already filtered to whatever period is selected — this
+  // function itself is period-agnostic). Returns rows sorted by
+  // combined score descending, each with { key, name, salesVolume,
+  // reliability, activeMonths, combined }. Parties with zero
+  // transactions for the given filter are left out entirely. This is
+  // a pure refactor of what used to be inlined in renderBestParties()
+  // below — the metric math and normalization are byte-for-byte the
+  // same, just reusable now.
+  window.computeBestPartiesForTxFilter = function(txFilterFn){
+    const rows = [];
+    if(typeof DB === 'undefined' || typeof txFilterFn !== 'function') return rows;
+
+    Object.keys(DB).forEach(function(key){
+      const party = DB[key];
+      if(!party) return;
+      const txs = txFilterFn(party) || [];
+      if(!txs.length) return; // skip inactive parties entirely
+
+      let salesVolume = 0, received = 0;
+      const monthsSeen = {};
+      txs.forEach(function(t){
+        salesVolume += safeNum(t.debit);
+        received += safeNum(t.credit);
+        if(t.date) monthsSeen[String(t.date).slice(0,7)] = true;
+      });
+      const reliability = salesVolume > 0 ? Math.min(1, Math.max(0, received / salesVolume)) : 0;
+      const activeMonths = Object.keys(monthsSeen).length;
+
+      rows.push({ key: key, name: party.name || key, salesVolume: salesVolume, reliability: reliability, activeMonths: activeMonths });
+    });
+
+    if(!rows.length) return rows;
+
+    // ── Normalize to 0-100 and combine (equal weighting) ──
+    const maxSales = Math.max.apply(null, rows.map(function(r){ return r.salesVolume; }).concat([0]));
+    const maxMonths = Math.max.apply(null, rows.map(function(r){ return r.activeMonths; }).concat([0]));
+    rows.forEach(function(r){
+      const scoreSales = maxSales > 0 ? (r.salesVolume / maxSales) * 100 : 0;
+      const scoreReliability = r.reliability * 100; // already 0-1, not normalized against the pool max
+      const scoreActivity = maxMonths > 0 ? (r.activeMonths / maxMonths) * 100 : 0;
+      r.combined = (scoreSales + scoreReliability + scoreActivity) / 3;
+    });
+    rows.sort(function(a,b){ return b.combined - a.combined; });
+    return rows;
+  };
+
+  // Recomputes and redraws the whole Best Parties table from the
+  // current DB + selected period. Nothing computed here is stored —
+  // this runs fresh every call. Builds the period's tx-filter and
+  // delegates all scoring to computeBestPartiesForTxFilter() above —
+  // output is unchanged from before the refactor.
+  window.renderBestParties = function(){
+    const tbody = document.getElementById('bpTableBody');
+    const table = document.getElementById('bpTable');
+    const emptyMsg = document.getElementById('bpEmptyMsg');
+    const showAllWrap = document.getElementById('bpShowAllWrap');
+    if(!tbody || !table || !emptyMsg || !showAllWrap) return;
+    if(typeof DB === 'undefined'){ return; }
+
+    const period = getBpViewFY();
+    const isAllTime = period === 'all';
+
+    const rows = window.computeBestPartiesForTxFilter(function(party){
+      if(isAllTime) return (party.transactions||[]).filter(function(t){ return t.particular!=='TOTAL AMOUNT' && t.date; });
+      return (typeof getFYTransactions==='function') ? getFYTransactions(party, period) : [];
+    });
+
+    if(!rows.length){
+      table.style.display = 'none';
+      showAllWrap.style.display = 'none';
+      emptyMsg.textContent = isAllTime
+        ? 'No party transactions found.'
+        : 'No party activity found for this fiscal year.';
+      emptyMsg.style.display = '';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+
+    // ── Render (top 10, or all if toggled) ──
+    const visible = _bpShowAll ? rows : rows.slice(0, 10);
+    function badgeColor(score){
+      return score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--gold)' : 'var(--red)';
+    }
+    let html = '';
+    visible.forEach(function(r, i){
+      html += '<tr>'
+        + '<td>' + (i+1) + '</td>'
+        + '<td><strong>' + r.name + '</strong></td>'
+        + '<td><span class="badge" style="background:' + badgeColor(r.combined) + ';color:#fff;font-size:11px;padding:3px 10px">' + r.combined.toFixed(1) + '</span></td>'
+        + '<td>' + (typeof fmt==='function' ? fmt(r.salesVolume) : r.salesVolume) + '</td>'
+        + '<td>' + (r.reliability*100).toFixed(0) + '%</td>'
+        + '<td>' + r.activeMonths + '</td>'
+        + '</tr>';
+    });
+    tbody.innerHTML = html;
+    table.style.display = '';
+
+    if(rows.length > 10){
+      showAllWrap.style.display = '';
+      const link = document.getElementById('bpShowAllLink');
+      if(link) link.textContent = _bpShowAll ? '← Show top 10' : ('Show all ' + rows.length + ' →');
+    } else {
+      showAllWrap.style.display = 'none';
+    }
+  };
+
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════
+     MONTHLY AWARD — Data Layer (additive only)
+     A record of which party won a given calendar (BS) month —
+     completely separate from the party ledger DB and from the
+     Cheque Book store. Mirrors the Cheque Book's Phase 1 pattern
+     exactly: Firebase-first-if-online, local cache fallback,
+     per-key PUT/DELETE (not whole-object rewrites).
+
+     Storage: Firebase path /kkledger/awards, an OBJECT keyed by BS
+     month string ("YYYY-MM", e.g. "2083-05") — one award per month,
+     since a month can only have one winner; recording again for the
+     same month upserts (overwrites) the previous record rather than
+     appending. localStorage cache key: kkAwards.
+
+     Record shape: { month, partyKey, partyName, score, salesVolume,
+     reliability, activeMonths, note, awardedAt }. score/salesVolume/
+     reliability/activeMonths are a SNAPSHOT taken at the moment the
+     award is recorded — deliberately not recomputed on every read,
+     unlike Best Parties above. A party's all-time numbers keep
+     changing as new transactions come in; a past month's award
+     result must not silently drift with them. "Re-record" is the
+     only way to overwrite a snapshot with a fresh computation.
+
+     Does NOT touch DB, the ledger save/sync logic, or CHEQUEBOOK.
+     ══════════════════════════════════════════════ -->
+<script>
+(function(){
+
+  const AW_LOCAL_KEY   = 'kkAwards';
+  const FB_AW_PATH      = '/kkledger/awards';       // base, no .json (per-month writes append it)
+  const FB_AW_ALL_PATH  = '/kkledger/awards.json';  // whole-object reads
+
+  // In-memory store — object keyed by BS month string, mirrors the Firebase shape.
+  let AWARDS = {};
+  try {
+    const cached = localStorage.getItem(AW_LOCAL_KEY);
+    if(cached) AWARDS = JSON.parse(cached) || {};
+  } catch(e){ AWARDS = {}; }
+
+  function _saveLocalAwards(){
+    try{ localStorage.setItem(AW_LOCAL_KEY, JSON.stringify(AWARDS)); }catch(e){}
+  }
+
+  // ── loadAwards() ──
+  // Firebase-first-if-online, fall back to local cache — same pattern
+  // as loadChequebook(). Populates AWARDS and returns it.
+  window.loadAwards = async function(){
+    if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
+      try{
+        const resp = await fetch(withAuth(FIREBASE_URL + FB_AW_ALL_PATH + '?t=' + Date.now()));
+        if(resp.ok){
+          const val = await resp.json();
+          if(val && typeof val === 'object'){
+            AWARDS = val;
+            _saveLocalAwards();
+          }
+        }
+      }catch(e){
+        console.warn('[KK] Could not load awards from Firebase, using local cache:', e);
+      }
+    }
+    // Otherwise: whatever was read from localStorage at declaration time stands.
+    return AWARDS;
+  };
+
+  // ── getAwards() / getAward(month) ──
+  // Cheap in-memory reads for the UI — do not refetch from Firebase.
+  window.getAwards = function(){ return AWARDS; };
+  window.getAward = function(month){ return AWARDS[month] || null; };
+
+  // ── saveAward(record) ──
+  // record.month is required (the key). Upsert: recording again for
+  // the same month overwrites the previous record rather than
+  // creating a second one. Same per-key PUT pattern as addCheque().
+  window.saveAward = async function(record){
+    if(!record || !record.month){
+      console.warn('[KK] saveAward: record.month is required');
+      return null;
+    }
+    const full = Object.assign({
+      month: record.month,
+      partyKey: '',
+      partyName: '',
+      score: 0,
+      salesVolume: 0,
+      reliability: 0,
+      activeMonths: 0,
+      note: '',
+      awardedAt: Date.now()
+    }, record, { month: record.month }); // month always wins — never let a passed-in month drift from the key
+
+    AWARDS[record.month] = full;
+    _saveLocalAwards();
+
+    if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
+      try{
+        const resp = await fetch(withAuth(FIREBASE_URL + FB_AW_PATH + '/' + encodeURIComponent(record.month) + '.json'), {
+          method: 'PUT',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(full)
+        });
+        if(!resp.ok) console.warn('[KK] Award push failed:', resp.status);
+      }catch(e){
+        console.warn('[KK] Award push failed, saved locally only:', e);
+      }
+    }
+    return full;
+  };
+
+  // ── deleteAward(month) ──
+  window.deleteAward = async function(month){
+    if(!AWARDS[month]) return false;
+    delete AWARDS[month];
+    _saveLocalAwards();
+
+    if(typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL && navigator.onLine){
+      try{
+        const resp = await fetch(withAuth(FIREBASE_URL + FB_AW_PATH + '/' + encodeURIComponent(month) + '.json'), {
+          method: 'DELETE'
+        });
+        if(!resp.ok) console.warn('[KK] Award delete push failed:', resp.status);
+      }catch(e){
+        console.warn('[KK] Award delete push failed, removed locally only:', e);
+      }
+    }
+    return true;
+  };
+
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════
+     MONTHLY AWARD — UI (additive only)
+     #maMonthPicker / setMaMonth() / populateMaMonthPicker() follow
+     the same "own independent period state" pattern as Best Parties'
+     _bpViewFY and Cheque Book's _cbViewFY — never reads/writes either
+     of those. Ranking for the selected month reuses
+     computeBestPartiesForTxFilter() from the Best Parties script
+     above, filtering each party's transactions to that one BS month
+     (String(t.date).slice(0,7) === month) — same formula, no second
+     copy of the scoring math. renderMonthlyAward() shows either the
+     live #1-ranked party with a "Record" button (no award saved yet
+     for this month) or the saved snapshot with "Re-record"/"Delete"
+     (an award already exists) — never both. Award History below it
+     reads straight from getAwards(), most recent month first.
+     ══════════════════════════════════════════════ -->
+<script>
+(function(){
+
+  // Own independent "which month is being viewed" state — null means
+  // "follow the current BS month".
+  let _maMonth = null;
+
+  function getCurrentBsMonth(){
+    const today = (typeof BS_TODAY_APPROX !== 'undefined' && BS_TODAY_APPROX)
+      ? BS_TODAY_APPROX
+      : (typeof adToBsApprox === 'function' ? adToBsApprox() : null);
+    return today ? String(today).slice(0,7) : null;
+  }
+
+  function getMaMonth(){
+    return _maMonth || getCurrentBsMonth();
+  }
+
+  // Every "YYYY-MM" that has at least one party transaction, earliest
+  // → latest — same derive-from-actual-data approach as
+  // getAllFYCodesWithData()/getAllChequeFYCodes(), just at month
+  // granularity instead of FY granularity.
+  function getAllMonthsWithTxData(){
+    const seen = {};
+    if(typeof DB !== 'undefined'){
+      Object.keys(DB).forEach(function(key){
+        const party = DB[key];
+        (party && party.transactions || []).forEach(function(t){
+          if(t.particular==='TOTAL AMOUNT' || !t.date) return;
+          seen[String(t.date).slice(0,7)] = true;
+        });
+      });
+    }
+    return Object.keys(seen).sort();
+  }
+
+  function formatMonthLabel(month){
+    const m = String(month).match(/^(\d{4})-(\d{2})$/);
+    if(!m) return month;
+    const yr = m[1], moIdx = parseInt(m[2],10) - 1;
+    const name = (typeof BS_MONTHS !== 'undefined' && BS_MONTHS[moIdx]) ? BS_MONTHS[moIdx] : m[2];
+    return name + ' ' + yr;
+  }
+
+  // Builds #maMonthPicker's option list — current BS month first
+  // (always offered, even with zero transactions yet, same as the FY
+  // pickers), then every past month that actually has a transaction,
+  // most recent first.
+  window.populateMaMonthPicker = function(){
+    const sel = document.getElementById('maMonthPicker');
+    if(!sel) return;
+    const currentMonth = getCurrentBsMonth();
+    const past = getAllMonthsWithTxData().filter(function(m){ return m!==currentMonth; }).reverse();
+    const months = currentMonth ? [currentMonth].concat(past) : past;
+    let html = months.map(function(m){
+      return '<option value="'+m+'">'+formatMonthLabel(m)+(m===currentMonth?' (current)':'')+'</option>';
+    }).join('');
+    sel.innerHTML = html;
+    sel.value = getMaMonth();
+  };
+
+  // Called from #maMonthPicker's onchange.
+  window.setMaMonth = function(month){
+    const currentMonth = getCurrentBsMonth();
+    _maMonth = (!month || month===currentMonth) ? null : month;
+    renderMonthlyAward();
+  };
+
+  // Ranks parties for the given month using the shared scoring core,
+  // filtering each party's transactions to that single BS month.
+  function rankForMonth(month){
+    if(typeof window.computeBestPartiesForTxFilter !== 'function') return [];
+    return window.computeBestPartiesForTxFilter(function(party){
+      return (party.transactions||[]).filter(function(t){
+        return t.particular!=='TOTAL AMOUNT' && t.date && String(t.date).slice(0,7)===month;
+      });
+    });
+  }
+
+  function fmtAmt(n){ return (typeof fmt==='function') ? fmt(n) : n; }
+  function fmtAwardedAt(ts){
+    if(!ts) return '—';
+    try{ return new Date(ts).toLocaleDateString('en-IN'); }catch(e){ return '—'; }
+  }
+
+  // ── recordMonthAward(month) ──
+  // Recomputes the month's ranking fresh and saves the #1 party as
+  // that month's snapshot (upsert — used for both the initial
+  // "Record" action and "Re-record").
+  window.recordMonthAward = async function(month){
+    const ranked = rankForMonth(month);
+    const top = ranked[0];
+    if(!top){
+      showToast && showToast('No ranked party for this month yet', 'red');
+      return;
+    }
+    await window.saveAward({
+      month: month,
+      partyKey: top.key,
+      partyName: top.name,
+      score: top.combined,
+      salesVolume: top.salesVolume,
+      reliability: top.reliability,
+      activeMonths: top.activeMonths
+    });
+    renderMonthlyAward();
+    if(typeof showToast==='function') showToast('🏅 Award recorded for '+formatMonthLabel(month), 'green');
+  };
+
+  // ── deleteMonthAward(month) ──
+  window.deleteMonthAward = async function(month){
+    if(!confirm('Delete the recorded award for '+formatMonthLabel(month)+'?')) return;
+    await window.deleteAward(month);
+    renderMonthlyAward();
+    if(typeof showToast==='function') showToast('Award deleted', 'red');
+  };
+
+  // Redraws #maContent (current month's live ranking or saved award)
+  // and #maHistoryTable (every recorded award). Nothing here writes
+  // to storage on its own — only the button handlers above do.
+  window.renderMonthlyAward = function(){
+    const content = document.getElementById('maContent');
+    if(!content) return;
+    const month = getMaMonth();
+    const existing = (typeof window.getAward==='function') ? window.getAward(month) : null;
+
+    if(existing){
+      content.innerHTML =
+        '<div style="background:var(--row-even);border:1.5px solid var(--border);border-radius:8px;padding:14px 16px">'
+        + '<div style="font-size:13px;color:var(--muted);margin-bottom:4px">Recorded winner for '+formatMonthLabel(month)+'</div>'
+        + '<div style="font-size:16px;font-weight:700;margin-bottom:8px">'+existing.partyName+' '
+          + '<span class="badge" style="background:var(--gold);color:#fff;font-size:11px;padding:3px 10px;margin-left:6px">'+Number(existing.score||0).toFixed(1)+'</span></div>'
+        + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Sales: '+fmtAmt(existing.salesVolume)+' &nbsp;|&nbsp; Reliability: '+Number((existing.reliability||0)*100).toFixed(0)+'% &nbsp;|&nbsp; Active Months: '+(existing.activeMonths||0)+' &nbsp;|&nbsp; Awarded: '+fmtAwardedAt(existing.awardedAt)+'</div>'
+        + '<button class="run-gap-btn" onclick="recordMonthAward(\''+month+'\')">🔁 Re-record</button> '
+        + '<button class="run-gap-btn" style="background:var(--red)" onclick="deleteMonthAward(\''+month+'\')">🗑️ Delete</button>'
+        + '</div>';
+    } else {
+      const ranked = rankForMonth(month);
+      const top = ranked[0];
+      if(!top){
+        content.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:13px">No party activity found for '+formatMonthLabel(month)+'.</div>';
+      } else {
+        content.innerHTML =
+          '<div style="background:var(--row-even);border:1.5px solid var(--border);border-radius:8px;padding:14px 16px">'
+          + '<div style="font-size:13px;color:var(--muted);margin-bottom:4px">#1 ranked party for '+formatMonthLabel(month)+' (not yet recorded)</div>'
+          + '<div style="font-size:16px;font-weight:700;margin-bottom:8px">'+top.name+' '
+            + '<span class="badge" style="background:var(--gold);color:#fff;font-size:11px;padding:3px 10px;margin-left:6px">'+top.combined.toFixed(1)+'</span></div>'
+          + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Sales: '+fmtAmt(top.salesVolume)+' &nbsp;|&nbsp; Reliability: '+(top.reliability*100).toFixed(0)+'% &nbsp;|&nbsp; Active Months: '+top.activeMonths+'</div>'
+          + '<button class="run-gap-btn" onclick="recordMonthAward(\''+month+'\')">🏅 Record This Month\'s Award</button>'
+          + '</div>';
+      }
+    }
+
+    renderAwardHistory();
+  };
+
+  // Award History table — every recorded award, most recent month first.
+  function renderAwardHistory(){
+    const table = document.getElementById('maHistoryTable');
+    const body = document.getElementById('maHistoryBody');
+    const emptyMsg = document.getElementById('maHistoryEmptyMsg');
+    if(!table || !body || !emptyMsg) return;
+    const all = (typeof window.getAwards==='function') ? window.getAwards() : {};
+    const months = Object.keys(all).sort().reverse();
+    if(!months.length){
+      table.style.display = 'none';
+      emptyMsg.textContent = 'No awards recorded yet.';
+      emptyMsg.style.display = '';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+    let html = '';
+    months.forEach(function(m){
+      const a = all[m];
+      html += '<tr>'
+        + '<td>'+formatMonthLabel(m)+'</td>'
+        + '<td>'+(a.partyName||'—')+'</td>'
+        + '<td><span class="badge" style="background:var(--gold);color:#fff;font-size:11px;padding:3px 10px">'+Number(a.score||0).toFixed(1)+'</span></td>'
+        + '<td>'+fmtAwardedAt(a.awardedAt)+'</td>'
+        + '</tr>';
+    });
+    body.innerHTML = html;
+    table.style.display = '';
+  }
 
 })();
 </script>
