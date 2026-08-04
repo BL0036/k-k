@@ -90,8 +90,17 @@ header{background:linear-gradient(135deg,#8b1a1a,#5a0f0f);color:#fff;padding:0 1
 .hdr-brand{display:flex;align-items:center;gap:12px;flex-shrink:0;}
 .hdr-logo{font-family:'Playfair Display',serif;font-size:18px;letter-spacing:.5px;text-shadow:0 1px 8px rgba(184,134,11,0.3);}
 .hdr-sub{font-size:11px;opacity:.75;margin-top:2px;}
-/* hdr-nav can shrink but never causes actions to be pushed off screen */
-.hdr-nav{display:flex;gap:4px;flex-wrap:nowrap;flex-shrink:1;min-width:0;overflow:hidden;}
+/* hdr-nav can shrink but never causes actions to be pushed off screen.
+   FIX: was flex-wrap:nowrap + overflow:hidden, which silently CLIPPED
+   trailing nav buttons (e.g. "Cheque Book") whenever the total button
+   width didn't fit the window on screens wider than the 1100px medium
+   breakpoint (many laptop/desktop screens, or a browser window that
+   isn't fully maximized). Wrapping instead of hiding means nav buttons
+   that don't fit on row 1 flow onto row 2 instead of disappearing —
+   header has height:auto so it grows to fit. Below 700px the hamburger
+   menu takes over regardless, so this only affects the in-between and
+   wide-screen cases. */
+.hdr-nav{display:flex;gap:4px;flex-wrap:wrap;flex-shrink:1;min-width:0;overflow:visible;}
 .nav-btn{padding:5px 9px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;color:#fff;font-size:11px;font-weight:500;cursor:pointer;transition:.2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
 .nav-btn.active,.nav-btn:hover{background:rgba(255,255,255,0.18);border-color:rgba(255,255,255,0.6);}
 /* hdr-actions never shrinks — Backup & Logout always stay visible */
@@ -553,6 +562,10 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
 .cb-notif-btn:hover{background:var(--accent);color:#fff;}
 .cb-notif-note{font-size:11px;color:var(--muted);}
 .cb-notif-note.granted{color:var(--green);}
+/* Dashboard cheque-alert banner — hidden by default (desktop already has
+   its own copy of this row on the Cheque Book page); shown only on mobile
+   via the existing ≤700px breakpoint, see the mobile block below. */
+.cb-notif-dash-row{display:none;}
 
 /* ── GAP CHECKER ── */
 .gap-report-box{background:var(--card);border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);border:1px solid var(--border);max-width:860px;}
@@ -1673,6 +1686,12 @@ body {
     align-items: center;
     z-index: 1000;
     border-top: 2px solid rgba(184, 134, 11, 0.4);
+    /* SAFETY NET: 8 tabs at min-width:44px (352px floor) can exceed the
+       viewport on the narrowest phones (~320px). Allow horizontal scroll
+       instead of silently clipping the last tab(s) off-screen — same
+       "never silently clip nav items" fix applied to the desktop header. */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .mob-tab {
@@ -1692,6 +1711,22 @@ body {
     border-radius: 8px;
     transition: background 0.15s, color 0.15s;
     flex: 1;
+    position: relative;
+  }
+  /* Cheque Book tab badge — mirrors #cbDueBadge on desktop's nav-btn */
+  .mob-tab-badge {
+    position: absolute;
+    top: 2px;
+    right: 10px;
+    background: var(--red);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 5px;
+    border-radius: 10px;
+    min-width: 14px;
+    text-align: center;
   }
   .mob-tab-icon  { font-size: 18px; line-height: 1; }
   .mob-tab-label { font-size: 10px; line-height: 1; font-family: 'DM Sans', sans-serif; }
@@ -1734,6 +1769,18 @@ body {
     border-radius: 2px;
     margin: 8px auto 12px;
   }
+
+  /* CHEQUE ALERT BANNER — mobile-only visibility (see .cb-notif-dash-row
+     default display:none above) */
+  .cb-notif-dash-row {
+    display: block !important;
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .cb-notif-dash-row:empty { display: none !important; }
 
   /* CHANGE 4 — Touch targets & tap feedback */
   button, .btn, .nav-btn, .modal-save, .modal-cancel,
@@ -2069,6 +2116,11 @@ body {
   <!-- DASHBOARD PAGE -->
   <div class="page active" id="page-dashboard">
     <div class="page-title">📊 Party Dashboard</div>
+    <!-- MOBILE CHEQUE ALERT BANNER (additive) — surfaces the same Cheque
+         Book reminder-permission prompt/status right on Dashboard, mobile
+         only, so it isn't missed buried inside the Cheque Book page.
+         Filled by renderCbNotifPermUI() alongside #cbNotifPermRow. -->
+    <div id="cbNotifPermRowDash" class="cb-notif-dash-row"></div>
     <div class="stat-row" id="statRow"></div>
     <div class="valley-tabs">
       <button class="vtab active" id="vtab-all" onclick="setValleyTab('all')">🗺️ All Parties</button>
@@ -2864,6 +2916,39 @@ body {
 // ── PASSWORD (stored in localStorage, default below) ──
 const DEFAULT_PASS = "Kandk@123";
 let loginAttempts = 0;
+
+// ── NOTIFICATION TAP-TO-OPEN (additive) ──
+// If the app was launched by tapping a cheque-due notification, sw.js's
+// notificationclick handler opens/focuses this page with ?openPage=<page>
+// (cold start) or postMessages {type:'notification-click', page} to an
+// already-open tab (see below). Captured once, up front, before doLogin()
+// has a chance to run — _pendingOpenPage is consumed inside doLogin()
+// itself (see there), since showPage() needs DB/Cheque Book loaded first.
+let _pendingOpenPage = null;
+try{
+  const _openPageParam = new URLSearchParams(location.search).get('openPage');
+  if(_openPageParam){
+    _pendingOpenPage = _openPageParam;
+    history.replaceState({}, '', location.pathname); // don't repeat on refresh
+  }
+}catch(e){}
+
+// Already-open-tab case: the service worker focuses this tab and posts
+// the same {type:'notification-click', page} message instead of a URL
+// param. If already logged in, navigate immediately; otherwise queue it
+// the same way as the cold-start case above, for doLogin() to pick up.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message', function(event){
+    if(event.data && event.data.type === 'notification-click' && event.data.page){
+      const appVisible = document.getElementById('app') && document.getElementById('app').style.display !== 'none';
+      if(appVisible && typeof showPage === 'function'){
+        showPage(event.data.page);
+      } else {
+        _pendingOpenPage = event.data.page;
+      }
+    }
+  });
+}
 function getPassword(){ return localStorage.getItem('kkPassword') || DEFAULT_PASS; }
 
 // ── COMPANY ──
@@ -3843,6 +3928,14 @@ function doLogin(){
     // without needing to open Reports first. Fully separate store —
     // does not touch DB/initDB() or the chequebook store.
     if(typeof loadAwards === 'function') loadAwards();
+    // NOTIFICATION TAP-TO-OPEN (additive): if the app was opened via a
+    // cheque-due notification tap (see _pendingOpenPage capture above),
+    // jump straight there now that Cheque Book data is loaded. One-shot —
+    // cleared immediately so it doesn't re-fire on a later re-login.
+    if(_pendingOpenPage && typeof showPage === 'function'){
+      showPage(_pendingOpenPage);
+      _pendingOpenPage = null;
+    }
     // Nudge user to change default password
     setTimeout(()=>{
       if(localStorage.getItem('kkPassword') === null){
@@ -8094,7 +8187,7 @@ function importFromExcel(input){
 
 <!-- ══════════════════════════════════════════════
      MOBILE BOTTOM NAVIGATION BAR
-     6 tabs: Home · Bill · Ledger · Receipt · Rc Reg · Bills
+     7 tabs: Home · Bill · Ledger · Receipt · Rc Reg · Bills · Cheque
      Visible only on ≤700px via CSS above.
      ══════════════════════════════════════════════ -->
 <div id="mobileBottomNav">
@@ -8128,6 +8221,35 @@ function importFromExcel(input){
     <span class="mob-tab-icon">📊</span>
     <span class="mob-tab-label">Bills</span>
   </button>
+  <button class="mob-tab" data-page="chequebook"
+    onclick="showPage('chequebook');closeHamburger()">
+    <span class="mob-tab-icon">💳</span>
+    <span class="mob-tab-label">Cheque</span>
+    <span class="mob-tab-badge" id="cbDueBadgeMobile" style="display:none"></span>
+  </button>
+  <button class="mob-tab" data-page="__more"
+    onclick="toggleMobileMoreMenu()">
+    <span class="mob-tab-icon">⋯</span>
+    <span class="mob-tab-label">More</span>
+  </button>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MOBILE "MORE" MENU (additive)
+     Reports + Old Records — the two pages not on the main bottom bar.
+     Reuses the existing .modal-overlay/.modal-box pattern (already a
+     bottom sheet on mobile via the CSS in the "MOBILE NATIVE APP
+     ENHANCEMENTS" block above).
+     ══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="mobileMoreModal" style="display:none" onclick="if(event.target===this) closeMobileMoreMenu()">
+  <div class="modal-box" style="max-width:360px">
+    <button class="modal-close" onclick="closeMobileMoreMenu()">&#x2715;</button>
+    <div class="page-title" style="font-size:18px;margin-bottom:14px">More</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="nav-btn" style="text-align:left;padding:12px 16px;font-size:14px" onclick="showPage('reports');closeMobileMoreMenu()">🔍 Reports</button>
+      <button class="nav-btn" style="text-align:left;padding:12px 16px;font-size:14px" onclick="showPage('archive');closeMobileMoreMenu()">🗄️ Old Records</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -8136,6 +8258,21 @@ function importFromExcel(input){
      Visible only on ≤700px via CSS above.
      ══════════════════════════════════════════════ -->
 <button id="fabAdd" title="Quick Receipt" onclick="showPage('receipt');closeHamburger()">＋</button>
+
+<!-- ══════════════════════════════════════════════
+     MOBILE "MORE" MENU — open/close handlers (additive)
+     ══════════════════════════════════════════════ -->
+<script>
+  window.toggleMobileMoreMenu = function(){
+    var m = document.getElementById('mobileMoreModal');
+    if(!m) return;
+    m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+  };
+  window.closeMobileMoreMenu = function(){
+    var m = document.getElementById('mobileMoreModal');
+    if(m) m.style.display = 'none';
+  };
+</script>
 
 <!-- ══════════════════════════════════════════════
      UNIFIED showPage() EXTENSION
@@ -8151,9 +8288,11 @@ function importFromExcel(input){
   window.showPage = function (name) {
     _orig.apply(this, arguments);
 
-    // 1 — Mobile bottom nav highlight
+    // 1 — Mobile bottom nav highlight (Reports/Old Records live behind
+    // the "More" tab, so light that tab up too when either is active)
     document.querySelectorAll('.mob-tab').forEach(function (btn) {
-      btn.classList.toggle('active', btn.dataset.page === name);
+      var isMoreTarget = btn.dataset.page === '__more' && (name === 'reports' || name === 'archive');
+      btn.classList.toggle('active', btn.dataset.page === name || isMoreTarget);
     });
 
     // 2 — Bill Entry extras
@@ -9164,41 +9303,53 @@ function importFromExcel(input){
   // Combined count: overdue reminders + needs-review (unknown payee)
   // cheques share this one badge, per explicit decision — no separate
   // indicator. Refresh points are unchanged (after save/toggle/remove/init).
+  // Drives both the desktop nav badge (#cbDueBadge) and the mobile bottom-nav
+  // badge (#cbDueBadgeMobile) — same count, same logic, two DOM targets.
   window.updateCbDueBadge = function(){
     const badge = document.getElementById('cbDueBadge');
-    if(!badge) return;
+    const badgeMobile = document.getElementById('cbDueBadgeMobile');
+    if(!badge && !badgeMobile) return;
     const dueCount = (typeof getDueReminders === 'function') ? getDueReminders().length : 0;
     const reviewCount = (typeof getCbNeedsReviewCount === 'function') ? getCbNeedsReviewCount() : 0;
     const n = dueCount + reviewCount;
-    if(n > 0){
-      badge.textContent = String(n);
-      badge.style.display = '';
-    } else {
-      badge.textContent = '';
-      badge.style.display = 'none';
-    }
+    [badge, badgeMobile].forEach(function(el){
+      if(!el) return;
+      if(n > 0){
+        el.textContent = String(n);
+        el.style.display = '';
+      } else {
+        el.textContent = '';
+        el.style.display = 'none';
+      }
+    });
   };
 
   // ── renderCbNotifPermUI() ──
-  // Fills #cbNotifPermRow based on Notification support + current
-  // permission state. Re-run after the user responds to the prompt.
+  // Fills #cbNotifPermRow (Cheque Book page) AND #cbNotifPermRowDash
+  // (Dashboard, mobile-only) based on Notification support + current
+  // permission state — same content, two targets. Re-run after the user
+  // responds to the prompt.
   function renderCbNotifPermUI(){
-    const row = document.getElementById('cbNotifPermRow');
-    if(!row) return;
+    const targets = [
+      document.getElementById('cbNotifPermRow'),
+      document.getElementById('cbNotifPermRowDash')
+    ].filter(Boolean);
+    if(!targets.length) return;
 
+    let html;
     if(typeof Notification === 'undefined'){
-      row.innerHTML = ''; // no Notification API at all — say nothing, nothing to offer
-      return;
-    }
-
-    const perm = Notification.permission;
-    if(perm === 'granted'){
-      row.innerHTML = '<span class="cb-notif-note granted">🔔 Reminders enabled — you\'ll get a notification when a cheque is due for a balance check.</span>';
-    } else if(perm === 'denied'){
-      row.innerHTML = '<span class="cb-notif-note">🔕 Notifications blocked — enable them in your browser\'s site settings to get cheque reminders.</span>';
+      html = ''; // no Notification API at all — say nothing, nothing to offer
     } else {
-      row.innerHTML = '<button type="button" class="cb-notif-btn" onclick="requestCbNotifPermission()">🔔 Enable Reminders</button>';
+      const perm = Notification.permission;
+      if(perm === 'granted'){
+        html = '<span class="cb-notif-note granted">🔔 Cheque reminders enabled — you\'ll get a notification when a cheque is due for a balance check.</span>';
+      } else if(perm === 'denied'){
+        html = '<span class="cb-notif-note">🔕 Notifications blocked — enable them in your browser\'s site settings to get cheque reminders.</span>';
+      } else {
+        html = '<button type="button" class="cb-notif-btn" onclick="requestCbNotifPermission()">🔔 Enable Cheque Reminders</button>';
+      }
     }
+    targets.forEach(function(el){ el.innerHTML = html; });
   }
   window.renderCbNotifPermUI = renderCbNotifPermUI;
 
@@ -9214,8 +9365,18 @@ function importFromExcel(input){
   };
 
   // ── checkDueChequeReminders() ──
-  // Fires a browser Notification for each due-and-unpaid cheque whose
-  // reminder date has arrived, once per cheque per BS day.
+  // Fires a notification for each due-and-unpaid cheque whose reminder
+  // date has arrived, once per cheque per BS day.
+  //
+  // MOBILE PWA FIX: `new Notification()` — the old approach — throws
+  // "Illegal constructor" on Android Chrome (and is unreliable in
+  // installed PWAs generally); those contexts require notifications to
+  // go through ServiceWorkerRegistration.showNotification() instead.
+  // This app already registers ./sw.js on load (see the top of the
+  // file), so the SW path is used whenever it's available — which is
+  // exactly the mobile/installed-PWA case that matters most here.
+  // Desktop browsers where no SW is registered still fall back to the
+  // plain constructor, so nothing regresses there.
   window.checkDueChequeReminders = function(){
     if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     if(typeof getDueReminders !== 'function') return;
@@ -9231,32 +9392,53 @@ function importFromExcel(input){
         if(localStorage.getItem(dedupeKey)) return; // already notified today
       }catch(e){ return; } // localStorage unavailable — don't risk duplicate spam
 
-      let notif;
-      try{
-        // Wording accuracy: "is due tomorrow" is only true on the exact
-        // day the reminder fires. The periodic sweep can also catch a
-        // reminder that's a day (or more) overdue — e.g. the tab was
-        // closed over a weekend — so branch on getReminderDate() vs.
-        // todayBs rather than always saying "tomorrow".
-        const reminderMsg = (typeof getReminderDate === 'function' && getReminderDate(cheque.date) === todayBs)
-          ? 'is due tomorrow — make sure funds are in the account.'
-          : 'was due for a balance check — please verify funds are in the account.';
-        notif = new Notification('💳 Cheque due for a balance check', {
-          body: 'Cheque #' + cheque.chequeNo + ' to ' + cheque.payee +
-                ' (Rs. ' + Number(cheque.amountRs||0).toLocaleString('en-IN') +
-                ') ' + reminderMsg,
-          tag: dedupeKey
-        });
-      }catch(e){ return; }
+      // Wording accuracy: "is due tomorrow" is only true on the exact
+      // day the reminder fires. The periodic sweep can also catch a
+      // reminder that's a day (or more) overdue — e.g. the tab was
+      // closed over a weekend — so branch on getReminderDate() vs.
+      // todayBs rather than always saying "tomorrow".
+      const reminderMsg = (typeof getReminderDate === 'function' && getReminderDate(cheque.date) === todayBs)
+        ? 'is due tomorrow — make sure funds are in the account.'
+        : 'was due for a balance check — please verify funds are in the account.';
+      const title = '💳 Cheque due for a balance check';
+      const body = 'Cheque #' + cheque.chequeNo + ' to ' + cheque.payee +
+            ' (Rs. ' + Number(cheque.amountRs||0).toLocaleString('en-IN') +
+            ') ' + reminderMsg;
+      const options = { body: body, tag: dedupeKey, data: { page: 'chequebook' } };
 
-      try{ localStorage.setItem(dedupeKey, '1'); }catch(e){}
-
-      notif.onclick = function(){
+      function markNotified(){
+        try{ localStorage.setItem(dedupeKey, '1'); }catch(e){}
+      }
+      function showViaConstructor(){
         try{
-          window.focus();
-          if(typeof showPage === 'function') showPage('chequebook');
-        }catch(e){}
-      };
+          const notif = new Notification(title, options);
+          notif.onclick = function(){
+            try{
+              window.focus();
+              if(typeof showPage === 'function') showPage('chequebook');
+            }catch(e){}
+          };
+          markNotified();
+        }catch(e){
+          // Notification API unavailable in this exact form (e.g. the
+          // "Illegal constructor" case on Android) — nothing more to
+          // try here; skip silently rather than throwing.
+        }
+      }
+
+      if('serviceWorker' in navigator && navigator.serviceWorker.ready){
+        navigator.serviceWorker.ready.then(function(reg){
+          return reg.showNotification(title, options);
+        }).then(function(){
+          markNotified();
+        }).catch(function(){
+          // SW path failed (e.g. no SW actually registered) — fall
+          // back to the plain constructor.
+          showViaConstructor();
+        });
+      } else {
+        showViaConstructor();
+      }
     });
   };
 
