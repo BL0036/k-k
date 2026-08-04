@@ -2667,9 +2667,11 @@ body {
       <div class="cb-row" id="cbEntryRow">
         <div class="bs-date-wrapper">
           <input type="text" class="bill-input" id="cbDate" placeholder="2082-08-15" readonly onclick="toggleBsPicker('cbDate')" style="cursor:pointer;width:100%">
+          <div class="bs-picker-popup" id="bsPicker_cbDate" style="display:none"></div>
         </div>
         <input type="text" class="bill-input" id="cbChequeNo" placeholder="e.g. 001234" autocomplete="off">
-        <input type="text" class="bill-input" id="cbPayee" placeholder="Payee's name" autocomplete="off">
+        <input type="text" class="bill-input" id="cbPayee" placeholder="Payee's name" autocomplete="off" list="cbPayeeList">
+        <datalist id="cbPayeeList"></datalist>
         <input type="number" class="bill-input" id="cbAmountRs" placeholder="0" min="0" step="1">
         <input type="number" class="bill-input" id="cbAmountPaisa" placeholder="00" min="0" max="99" step="1">
       </div>
@@ -2698,6 +2700,7 @@ body {
             <option value="chequeno_asc">Cheque No (ascending)</option>
             <option value="chequeno_desc">Cheque No (descending)</option>
           </select>
+          <button class="exp-btn exp-pdf" onclick="exportChequeBookPDF()">🖨️ PDF</button>
         </div>
         <table class="bill-log-table">
           <thead><tr>
@@ -3030,6 +3033,14 @@ function getBSDays(year, month){
 }
 function toggleBsPicker(inputId){
   const pop = document.getElementById('bsPicker_'+inputId);
+  if(!pop){
+    // Defensive guard (BUGFIX): a date input wired to toggleBsPicker()
+    // must have a matching #bsPicker_<inputId> popup div next to it —
+    // without one this used to fail silently (click did nothing).
+    console.warn('[KK] toggleBsPicker: missing #bsPicker_'+inputId+' popup div');
+    if(typeof showToast==='function') showToast('⚠ Date picker not available for this field', 'red');
+    return;
+  }
   const allPops = document.querySelectorAll('.bs-picker-popup');
   allPops.forEach(p=>{ if(p.id !== 'bsPicker_'+inputId) p.style.display='none'; });
   if(pop.style.display==='block'){ pop.style.display='none'; return; }
@@ -8547,6 +8558,55 @@ function importFromExcel(input){
     });
   }
 
+  // ── PAYEE AUTOCOMPLETE (additive) ──
+  // Rebuilds #cbPayeeList (a native <datalist> bound to #cbPayee via
+  // list="cbPayeeList") from every distinct payee name already in
+  // _cbCache — no new storage, just a live read of cheques already
+  // recorded. Typing e.g. "bi" then matches/suggests "Bikash
+  // Lamichhane" etc. via the browser's own datalist filtering. Called
+  // from renderChequebook() below so it's always fresh after every
+  // load/save/toggle/delete, same as the list itself.
+  function populateCbPayeeDatalist(){
+    const dl = document.getElementById('cbPayeeList');
+    if(!dl) return;
+    const seen = {};
+    Object.values(_cbCache).forEach(function(c){
+      if(c && c.payee) seen[c.payee] = true;
+    });
+    const names = Object.keys(seen).sort(function(a,b){ return a.localeCompare(b); });
+    dl.innerHTML = names.map(function(n){ return '<option value="'+cbEsc(n)+'"></option>'; }).join('');
+  }
+
+  // ── getFilteredSortedCheques() ──
+  // The exact FY scope → status filter → sort pipeline renderChequebook()
+  // uses to decide what's on screen, pulled out so exportChequeBookPDF()
+  // below can export precisely what's currently visible instead of a
+  // second copy of this logic. Read-only — never touches _cbCache.
+  function getFilteredSortedCheques(){
+    const scopeFY = getViewFYChequebook();
+    let list = Object.values(_cbCache)
+      .filter(function(c){
+        return !scopeFY || (typeof getFiscalYear !== 'function') || getFiscalYear(c.date) === scopeFY;
+      });
+
+    if(_cbStatusFilter === 'due'){
+      list = list.filter(function(c){ return c.status === 'due'; });
+    } else if(_cbStatusFilter === 'paid'){
+      list = list.filter(function(c){ return c.status === 'paid'; });
+    } // 'all' → no filter
+
+    if(_cbSortBy === 'date_asc'){
+      list.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+    } else if(_cbSortBy === 'chequeno_asc'){
+      list.sort(cbCompareChequeNo);
+    } else if(_cbSortBy === 'chequeno_desc'){
+      list.sort(function(a,b){ return cbCompareChequeNo(b,a); });
+    } else { // 'date_desc' (default)
+      list.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    }
+    return list;
+  }
+
   // ── renderChequebook() ──
   // Renders #cbLogBody from _cbCache — FY scope → status filter → sort,
   // in that order, before rendering rows. Rows past their reminder date
@@ -8559,35 +8619,9 @@ function importFromExcel(input){
     const body = document.getElementById('cbLogBody');
     if(!body) return; // page not in DOM yet — nothing to render into
 
-    // FY SCOPE (REFINEMENT): filter to the cheque-book's own FY picker
-    // before sorting — independent of Dashboard/Ledger's viewFY. The
-    // reminder amber-highlight below is unaffected: it only looks at
-    // each cheque's own date/status, never which FY is being viewed.
-    const scopeFY = getViewFYChequebook();
-    let list = Object.values(_cbCache)
-      .filter(function(c){
-        return !scopeFY || (typeof getFiscalYear !== 'function') || getFiscalYear(c.date) === scopeFY;
-      });
+    populateCbPayeeDatalist(); // keep payee autocomplete in sync with the data
 
-    // STATUS FILTER (DISPLAY PATCH): applied AND-together with the FY
-    // scope above, independent of it.
-    if(_cbStatusFilter === 'due'){
-      list = list.filter(function(c){ return c.status === 'due'; });
-    } else if(_cbStatusFilter === 'paid'){
-      list = list.filter(function(c){ return c.status === 'paid'; });
-    } // 'all' → no filter
-
-    // SORT (DISPLAY PATCH): default 'date_desc' matches the prior
-    // (only) behavior.
-    if(_cbSortBy === 'date_asc'){
-      list.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-    } else if(_cbSortBy === 'chequeno_asc'){
-      list.sort(cbCompareChequeNo);
-    } else if(_cbSortBy === 'chequeno_desc'){
-      list.sort(function(a,b){ return cbCompareChequeNo(b,a); });
-    } else { // 'date_desc' (default)
-      list.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-    }
+    let list = getFilteredSortedCheques();
 
     const countEl = document.getElementById('cbLogCount');
     if(countEl){
@@ -8623,6 +8657,103 @@ function importFromExcel(input){
         + '</tr>';
     });
     body.innerHTML = html;
+  };
+
+  // ── exportChequeBookPDF() (additive) ──
+  // Prints/saves-as-PDF exactly what's currently visible in the Cheque
+  // Book list — same FY scope, status filter and sort as the on-screen
+  // table (via getFilteredSortedCheques() above), so switching those
+  // controls changes what gets exported too. Uses the same blob-URL +
+  // window.print() pattern as the Party Ledger's exportPDF() elsewhere
+  // in the file, so it inherits the same Android/popup-blocked
+  // fallbacks — no changes to that function, no new dependency.
+  window.exportChequeBookPDF = function(){
+    const list = getFilteredSortedCheques();
+    if(!list.length){
+      if(typeof showToast==='function') showToast('Nothing to export for the current filter', 'red');
+      return;
+    }
+
+    const scopeFY = getViewFYChequebook();
+    const scopeLabel = scopeFY ? ('FY ' + scopeFY.replace('-','/')) : 'All';
+    const statusLabel = _cbStatusFilter === 'due' ? 'Due only' : (_cbStatusFilter === 'paid' ? 'Paid only' : 'All statuses');
+
+    let totalRs = 0, totalPaisa = 0;
+    list.forEach(function(c){ totalRs += Number(c.amountRs||0); totalPaisa += Number(c.amountPaisa||0); });
+    totalRs += Math.floor(totalPaisa/100);
+    totalPaisa = totalPaisa % 100;
+
+    let rows = '';
+    list.forEach(function(c, i){
+      rows += '<tr style="background:'+(i%2?'#fff':'#faf7f0')+'">'
+        + '<td>' + cbEsc(c.date) + '</td>'
+        + '<td>' + cbEsc(c.chequeNo) + '</td>'
+        + '<td>' + cbEsc(c.payee) + '</td>'
+        + '<td style="text-align:right">' + cbFmtAmount(c.amountRs, c.amountPaisa) + '</td>'
+        + '<td>' + cbEsc(c.remarks) + '</td>'
+        + '<td>' + (c.status==='paid' ? 'Paid' : 'Due') + '</td>'
+        + '</tr>';
+    });
+    rows += '<tr style="background:#f0e8d8;font-weight:700">'
+      + '<td colspan="3">TOTAL (' + list.length + ' cheque' + (list.length===1?'':'s') + ')</td>'
+      + '<td style="text-align:right">' + cbFmtAmount(totalRs, totalPaisa) + '</td>'
+      + '<td colspan="2"></td></tr>';
+
+    const coInfo = [COMPANY.pan?'PAN: '+COMPANY.pan:'',COMPANY.addr,COMPANY.phone?'Ph: '+COMPANY.phone:''].filter(Boolean).join(' | ');
+
+    const html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<title>Cheque Book</title><style>'
+      + '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}'
+      + '@page{size:A4;margin:15mm;}'
+      + 'body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:20px;color:#000;background:#fff;}'
+      + '.header{text-align:center;border-bottom:2px solid #8b1a1a;padding-bottom:12px;margin-bottom:16px}'
+      + '.co-name{font-size:18px;font-weight:bold;color:#8b1a1a;letter-spacing:1px}'
+      + '.co-info{font-size:10px;color:#555;margin-top:3px}'
+      + '.sub-title{font-size:15px;font-weight:bold;color:#333;margin-top:8px}'
+      + 'table{width:100%;border-collapse:collapse;margin-bottom:16px}'
+      + 'th{background:#8b1a1a;color:#fff;padding:7px 10px;font-size:10px}'
+      + 'td{padding:5px 10px;border-bottom:1px solid #e8ddd0;font-size:11px;}'
+      + 'tr{page-break-inside:avoid;}'
+      + '@media print{ body{padding:0;} tr{page-break-inside:avoid!important;} }'
+      + '</style></head><body>'
+      + '<div class="header">'
+      + '<div class="co-name">' + (COMPANY.name||'') + '</div>'
+      + '<div class="co-info">' + coInfo + '</div>'
+      + '<div class="sub-title">Cheque Book — ' + scopeLabel + ' | ' + statusLabel + '</div>'
+      + '<div style="font-size:10px;color:#888;margin-top:4px">Printed: ' + new Date().toLocaleString('en-IN') + '</div>'
+      + '</div>'
+      + '<table><thead><tr><th>Date (BS)</th><th>Cheque No.</th><th>Payee</th><th>Amount</th><th>Remarks</th><th>Status</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table>'
+      + '<div style="text-align:right;font-size:10px;color:#888;margin-top:8px">' + (COMPANY.name||'K & K Trading Concern') + ' — Cheque Book</div>'
+      + '</body></html>';
+
+    const blob = new Blob([html], {type: 'text/html'});
+    const blobUrl = URL.createObjectURL(blob);
+    const win = window.open(blobUrl, '_blank');
+    if(!win){
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+      document.body.appendChild(iframe);
+      iframe.onload = function(){
+        setTimeout(function(){
+          try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){}
+          setTimeout(function(){ document.body.removeChild(iframe); URL.revokeObjectURL(blobUrl); }, 2000);
+        }, 400);
+      };
+      iframe.src = blobUrl;
+      if(typeof showToast==='function') showToast('⚠ Popup blocked — trying iframe print...', '');
+      return;
+    }
+    win.onload = function(){
+      setTimeout(function(){
+        try{ win.focus(); win.print(); }catch(e){}
+        setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 3000);
+      }, 350);
+    };
+    setTimeout(function(){
+      try{ if(win && !win.closed){ win.focus(); win.print(); } }catch(e){}
+    }, 1200);
   };
 
   // ── saveCheque() ──
