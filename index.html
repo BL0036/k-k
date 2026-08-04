@@ -2665,10 +2665,7 @@ body {
         <span>Paisa</span>
       </div>
       <div class="cb-row" id="cbEntryRow">
-        <div class="bs-date-wrapper">
-          <input type="text" class="bill-input" id="cbDate" placeholder="2082-08-15" readonly onclick="toggleBsPicker('cbDate')" style="cursor:pointer;width:100%">
-          <div class="bs-picker-popup" id="bsPicker_cbDate" style="display:none"></div>
-        </div>
+        <input type="text" class="bill-input" id="cbDate" placeholder="2082-08-15" maxlength="10" autocomplete="off" style="width:100%">
         <input type="text" class="bill-input" id="cbChequeNo" placeholder="e.g. 001234" autocomplete="off">
         <input type="text" class="bill-input" id="cbPayee" placeholder="Payee's name" autocomplete="off" list="cbPayeeList">
         <datalist id="cbPayeeList"></datalist>
@@ -2686,14 +2683,19 @@ body {
       <div class="bill-log" id="cbLogWrap">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
           <div class="bill-log-title" style="margin-bottom:0">All Cheques<span class="bill-log-count" id="cbLogCount" style="display:none"></span></div>
-          <select id="viewFYChequebook" onchange="setViewFYChequebook(this.value)" title="View a different fiscal year" style="max-width:180px"></select>
+          <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <label for="viewFYChequebook" style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">FY:</label>
+            <select id="viewFYChequebook" onchange="setViewFYChequebook(this.value)" title="View a different fiscal year" style="max-width:180px"></select>
+          </span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <label for="cbStatusFilter" style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Status:</label>
           <select id="cbStatusFilter" onchange="setCbStatusFilter(this.value)" title="Filter by status" style="max-width:130px">
             <option value="due">Due</option>
             <option value="paid">Paid</option>
             <option value="all">All</option>
           </select>
+          <label for="cbSortBy" style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Sort:</label>
           <select id="cbSortBy" onchange="setCbSortBy(this.value)" title="Sort the list" style="max-width:190px">
             <option value="date_desc">Date (newest first)</option>
             <option value="date_asc">Date (oldest first)</option>
@@ -7539,10 +7541,12 @@ if ('serviceWorker' in navigator) {
     if(cbPage && cbPage.contains(active)){
       if(active.tagName === 'INPUT' && (active.disabled || active.type === 'hidden')) return;
 
-      // Date field: readonly (opens the BS picker on click, or is
-      // already default-filled by showPage()'s 'chequebook' branch) —
-      // nothing to validate here, just advance to Cheque No, same
-      // reasoning as rcNo→rcDate above.
+      // Date field: freely typed (BUGFIX: no longer opens a BS picker —
+      // format validation + normalization happens in saveCheque()
+      // instead). Enter here just advances to Cheque No, same
+      // reasoning as rcNo→rcDate above; unlike rcDate, no inline
+      // validation-on-Enter here, since saveCheque() below already
+      // validates+normalizes before ever storing the value.
       if(active.id === 'cbDate'){
         e.preventDefault();
         document.getElementById('cbChequeNo').focus();
@@ -8197,9 +8201,11 @@ function importFromExcel(input){
           Amount Rs → Amount Paisa → Remarks → save) added to the
           existing delegated document keydown listener (CHEQUE_ENTRY_
           FIELDS + advanceFocus()), same mechanism Bill Entry/Receipt
-          Entry already use. cbDate is readonly/picker like Bill
-          Entry's own date field is NOT, so Enter on cbDate just
-          advances rather than validating a typed value.
+          Entry already use. Enter on cbDate just advances to Cheque
+          No rather than validating a typed value — validation +
+          normalization of cbDate happens once, in saveCheque() (see
+          "CHEQUE BOOK — BUGFIX: cbDate freely typed" below), not on
+          every Enter press.
        3. #viewFYChequebook — a cheque-book-only FY picker (own
           _cbViewFY/getViewFYChequebook() state, entirely separate from
           the shared viewFY/getViewFY() Dashboard and Ledger use).
@@ -8756,12 +8762,32 @@ function importFromExcel(input){
     }, 1200);
   };
 
+  // ── CHEQUE BOOK — BUGFIX: cbDate freely typed (no more BS picker) ──
+  // normalizeCbDate(val) validates a plausible BS date shape — 4-digit
+  // year, 1-2 digit month (1-12), 1-2 digit day (1 to that month's
+  // actual day count via getBSDays()), dash-separated — and returns
+  // it zero-padded to exactly "YYYY-MM-DD" (e.g. "2082-8-5" →
+  // "2082-08-05"). Returns null for anything that doesn't parse to a
+  // plausible date. Normalizing here, once, before the value ever
+  // reaches storage, is what keeps getFiscalYear()/getReminderDate()/
+  // getFYTransactions() etc. working unchanged — they all assume that
+  // exact zero-padded shape.
+  function normalizeCbDate(val){
+    const m = String(val||'').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if(!m) return null;
+    const y = parseInt(m[1],10), mo = parseInt(m[2],10), d = parseInt(m[3],10);
+    if(y < 2000 || y > 2100 || mo < 1 || mo > 12 || d < 1) return null;
+    const maxDay = (typeof getBSDays === 'function') ? getBSDays(y, mo) : 32;
+    if(d > maxDay) return null;
+    return y + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+  }
+
   // ── saveCheque() ──
   // Reads the entry form, validates, calls addCheque(), clears the
   // form, and re-renders the list. Required: date, cheque no, payee,
   // amountRs (>0). amountPaisa optional, defaults to 0, capped 0-99.
   window.saveCheque = async function(){
-    const date     = (document.getElementById('cbDate').value||'').trim();
+    let date       = (document.getElementById('cbDate').value||'').trim();
     const chequeNo = (document.getElementById('cbChequeNo').value||'').trim();
     const payee    = (document.getElementById('cbPayee').value||'').trim();
     const rsVal    = document.getElementById('cbAmountRs').value;
@@ -8772,11 +8798,27 @@ function importFromExcel(input){
     amountPaisa = Math.min(99, Math.max(0, amountPaisa));
     const remarks  = (document.getElementById('cbRemarks').value||'').trim();
 
+    // BUGFIX: validate + normalize the freely-typed date before
+    // anything else — a non-blank-but-invalid date must be caught
+    // here rather than silently saved. Blank date still falls through
+    // to the generic required-fields check below, unchanged.
+    if(date){
+      const normalized = normalizeCbDate(date);
+      if(!normalized){
+        if(typeof showToast === 'function') showToast('⚠ Invalid date — use YYYY-MM-DD, e.g. 2082-08-15', 'red');
+        else alert('Invalid date — use YYYY-MM-DD, e.g. 2082-08-15');
+        return;
+      }
+      date = normalized;
+      document.getElementById('cbDate').value = date; // reflect the normalized value back
+    }
+
     if(!date || !chequeNo || !payee || !(amountRs > 0)){
       if(typeof showToast === 'function') showToast('⚠ Fill Date, Cheque No, Payee and Amount (Rs.)', 'red');
       else alert('Fill Date, Cheque No, Payee and Amount (Rs.)');
       return;
     }
+
 
     const btn = document.getElementById('cbSaveBtn');
     if(btn) btn.disabled = true;
