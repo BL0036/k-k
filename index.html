@@ -537,6 +537,17 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
 /* Due-reminder highlight — visual only, no popup (Phase 3 adds notifications) */
 .cb-due-row td{background:#fdecea!important;}
 [data-theme="dark"] .cb-due-row td{background:#4a1f1a!important;}
+/* Needs-review (unknown payee) highlight — distinct purple/grey tint, plus a
+   combined-state color for rows that are BOTH overdue AND needs-review so
+   the two never visually conflict (the combined selector has higher
+   specificity and wins over either single-state rule). */
+.cb-review-row td{background:#f1edfb!important;}
+[data-theme="dark"] .cb-review-row td{background:#3a3450!important;}
+.cb-due-row.cb-review-row td{background:#f6e3e0!important;}
+[data-theme="dark"] .cb-due-row.cb-review-row td{background:#442a3f!important;}
+.cb-review-cell{font-style:italic;color:var(--muted);}
+.cb-review-badge{font-size:10px;font-weight:700;color:#7e57c2;margin-left:6px;white-space:nowrap;}
+[data-theme="dark"] .cb-review-badge{color:#b39ddb;}
 /* CHEQUE BOOK (Phase 3) — notification permission UI, additive */
 .cb-notif-btn{padding:4px 12px;border-radius:12px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.2s;}
 .cb-notif-btn:hover{background:var(--accent);color:#fff;}
@@ -2672,12 +2683,19 @@ body {
         <input type="number" class="bill-input" id="cbAmountRs" placeholder="0" min="0" step="1">
         <input type="number" class="bill-input" id="cbAmountPaisa" placeholder="00" min="0" max="99" step="1">
       </div>
+      <!-- UNKNOWN PAYEE FLAG (additive) — when checked, Payee becomes optional in saveCheque()'s validation -->
+      <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="cbUnknownPayee">
+        <label for="cbUnknownPayee" style="font-size:12px;color:var(--muted);cursor:pointer">❓ Don't know payee yet — ask manager</label>
+      </div>
       <div style="margin-top:6px">
         <input type="text" class="bill-input" id="cbRemarks" placeholder="Remarks (optional)" style="width:100%">
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
         <button class="bill-save-btn" id="cbSaveBtn" onclick="saveCheque()">+ Save Cheque</button>
       </div>
+      <!-- EDIT MODE BANNER (additive) — shown only while editing an existing cheque -->
+      <div id="cbEditBanner" style="display:none;margin-top:6px;font-size:12px;color:var(--muted)"></div>
       <!-- NEXT CHEQUE NO. HINT -->
       <div class="be-next-bn-hint" id="cbNextChequeHint"></div>
       <div class="bill-log" id="cbLogWrap">
@@ -2703,7 +2721,10 @@ body {
             <option value="chequeno_desc">Cheque No (descending)</option>
           </select>
           <button class="exp-btn exp-pdf" onclick="exportChequeBookPDF()">🖨️ PDF</button>
+          <button class="exp-btn" onclick="checkChequeNoGaps()">🔍 Check for Missing Cheques</button>
         </div>
+        <!-- CHEQUE-NUMBER GAP CHECK panel (additive) — filled by checkChequeNoGaps() -->
+        <div id="cbGapPanel" style="display:none;margin-bottom:10px;padding:8px 10px;background:var(--row-even);border-radius:8px;"></div>
         <table class="bill-log-table">
           <thead><tr>
             <th>Date</th><th>Cheque No.</th><th>Payee</th><th>Amount</th><th>Remarks</th><th>Status</th><th class="no-print"></th>
@@ -8415,6 +8436,17 @@ function importFromExcel(input){
 
   let _cbCache = {}; // mirrors the Phase 1 chequebook object, for rendering only
 
+  // BUGFIX (double-save guard) — true while a saveCheque() call is in
+  // flight, so a fast double-Enter / double-click can't fire the save
+  // logic twice before the form clears. See saveCheque() below.
+  let _cbSaving = false;
+
+  // EDIT MODE — id of the cheque currently being edited, or null when
+  // the form is in normal "add a new cheque" mode. Set by editCheque(),
+  // cleared by cancelCbEdit() and after a successful update in
+  // saveCheque(). See editCheque()/cancelCbEdit() below.
+  let _cbEditingId = null;
+
   // ── Cheque Book FY scope (REFINEMENT) ──
   // Own independent "which FY is being viewed" state — deliberately
   // NOT the same viewFY/getViewFY() that Dashboard/Ledger share, so
@@ -8649,17 +8681,26 @@ function importFromExcel(input){
       const isDue = c.status === 'due';
       const reminderDate = (typeof getReminderDate === 'function') ? getReminderDate(c.date) : null;
       const isReminderDue = isDue && reminderDate && todayBs && reminderDate <= todayBs;
-      const rowClass = isReminderDue ? ' class="cb-due-row"' : '';
+      const isReview = c.needsReview === true;
+      const rowClasses = [];
+      if(isReminderDue) rowClasses.push('cb-due-row');
+      if(isReview) rowClasses.push('cb-review-row');
+      const rowClass = rowClasses.length ? ' class="' + rowClasses.join(' ') + '"' : '';
       const statusBtnClass = isDue ? 'cb-status-due' : 'cb-status-paid';
       const statusLabel = isDue ? '⏳ Due' : '✅ Paid';
+      // UNKNOWN PAYEE FLAG: distinct styling + inline nudge so it's clear
+      // this is a placeholder, not the real payee, and needs to be edited.
+      const payeeCell = isReview
+        ? '<span class="cb-review-cell">' + cbEsc(c.payee) + '</span><span class="cb-review-badge">❓ needs payee — tap ✏️ to edit</span>'
+        : cbEsc(c.payee);
       html += '<tr'+rowClass+'>'
         + '<td>' + cbEsc(c.date) + '</td>'
         + '<td>' + cbEsc(c.chequeNo) + '</td>'
-        + '<td>' + cbEsc(c.payee) + '</td>'
+        + '<td>' + payeeCell + '</td>'
         + '<td>' + cbFmtAmount(c.amountRs, c.amountPaisa) + '</td>'
         + '<td>' + cbEsc(c.remarks) + '</td>'
         + '<td><button class="cb-status-btn ' + statusBtnClass + '" onclick="toggleChequeStatus(\'' + c.id + '\')">' + statusLabel + '</button></td>'
-        + '<td class="no-print"><button class="del-btn" onclick="removeCheque(\'' + c.id + '\')">✕</button></td>'
+        + '<td class="no-print"><button class="edit-btn" onclick="editCheque(\'' + c.id + '\')" title="Edit this cheque">✏️</button> <button class="del-btn" onclick="removeCheque(\'' + c.id + '\')">✕</button></td>'
         + '</tr>';
     });
     body.innerHTML = html;
@@ -8783,68 +8824,190 @@ function importFromExcel(input){
   }
 
   // ── saveCheque() ──
-  // Reads the entry form, validates, calls addCheque(), clears the
-  // form, and re-renders the list. Required: date, cheque no, payee,
-  // amountRs (>0). amountPaisa optional, defaults to 0, capped 0-99.
+  // Reads the entry form, validates, calls addCheque() (or updateCheque()
+  // when in edit mode — see EDIT FUNCTION below), clears the form, and
+  // re-renders the list. Required: date, cheque no, payee, amountRs (>0).
+  // amountPaisa optional, defaults to 0, capped 0-99.
+  //
+  // BUGFIX (double-save guard): the whole body below is wrapped in the
+  // _cbSaving guard so a fast double-Enter / double-click before the
+  // first save's Firebase write resolves can't fire it twice and create
+  // duplicate records. Guarded at the very top; released in `finally`
+  // no matter which return path is taken or whether save throws.
   window.saveCheque = async function(){
-    let date       = (document.getElementById('cbDate').value||'').trim();
-    const chequeNo = (document.getElementById('cbChequeNo').value||'').trim();
-    const payee    = (document.getElementById('cbPayee').value||'').trim();
-    const rsVal    = document.getElementById('cbAmountRs').value;
-    const psVal    = document.getElementById('cbAmountPaisa').value;
-    const amountRs = parseFloat(rsVal) || 0;
-    let amountPaisa = parseInt(psVal, 10);
-    if(isNaN(amountPaisa)) amountPaisa = 0;
-    amountPaisa = Math.min(99, Math.max(0, amountPaisa));
-    const remarks  = (document.getElementById('cbRemarks').value||'').trim();
-
-    // BUGFIX: validate + normalize the freely-typed date before
-    // anything else — a non-blank-but-invalid date must be caught
-    // here rather than silently saved. Blank date still falls through
-    // to the generic required-fields check below, unchanged.
-    if(date){
-      const normalized = normalizeCbDate(date);
-      if(!normalized){
-        if(typeof showToast === 'function') showToast('⚠ Invalid date — use YYYY-MM-DD, e.g. 2082-08-15', 'red');
-        else alert('Invalid date — use YYYY-MM-DD, e.g. 2082-08-15');
-        return;
-      }
-      date = normalized;
-      document.getElementById('cbDate').value = date; // reflect the normalized value back
-    }
-
-    if(!date || !chequeNo || !payee || !(amountRs > 0)){
-      if(typeof showToast === 'function') showToast('⚠ Fill Date, Cheque No, Payee and Amount (Rs.)', 'red');
-      else alert('Fill Date, Cheque No, Payee and Amount (Rs.)');
-      return;
-    }
-
-
+    if(_cbSaving) return; // duplicate trigger while a save is already in flight — ignore silently
+    _cbSaving = true;
     const btn = document.getElementById('cbSaveBtn');
     if(btn) btn.disabled = true;
     try{
-      const record = await addCheque({
-        date: date, chequeNo: chequeNo, payee: payee,
-        amountRs: amountRs, amountPaisa: amountPaisa,
-        remarks: remarks, status: 'due'
-      });
-      _cbCache[record.id] = record;
+      let date       = (document.getElementById('cbDate').value||'').trim();
+      const chequeNo = (document.getElementById('cbChequeNo').value||'').trim();
+      const payee    = (document.getElementById('cbPayee').value||'').trim();
+      const rsVal    = document.getElementById('cbAmountRs').value;
+      const psVal    = document.getElementById('cbAmountPaisa').value;
+      const amountRs = parseFloat(rsVal) || 0;
+      let amountPaisa = parseInt(psVal, 10);
+      if(isNaN(amountPaisa)) amountPaisa = 0;
+      amountPaisa = Math.min(99, Math.max(0, amountPaisa));
+      const remarks  = (document.getElementById('cbRemarks').value||'').trim();
+      // UNKNOWN PAYEE FLAG: when checked, Payee is optional below and the
+      // record is saved with a placeholder name + needsReview: true.
+      const unknownPayeeEl = document.getElementById('cbUnknownPayee');
+      const unknownPayeeChecked = !!(unknownPayeeEl && unknownPayeeEl.checked);
 
-      document.getElementById('cbChequeNo').value = '';
-      document.getElementById('cbPayee').value = '';
-      document.getElementById('cbAmountRs').value = '';
-      document.getElementById('cbAmountPaisa').value = '';
-      document.getElementById('cbRemarks').value = '';
-      // Date is deliberately left as-is — issuing several cheques on
-      // the same date is common, same reasoning as beDate/rcDate.
+      // BUGFIX: validate + normalize the freely-typed date before
+      // anything else — a non-blank-but-invalid date must be caught
+      // here rather than silently saved. Blank date still falls through
+      // to the generic required-fields check below, unchanged.
+      if(date){
+        const normalized = normalizeCbDate(date);
+        if(!normalized){
+          if(typeof showToast === 'function') showToast('⚠ Invalid date — use YYYY-MM-DD, e.g. 2082-08-15', 'red');
+          else alert('Invalid date — use YYYY-MM-DD, e.g. 2082-08-15');
+          return;
+        }
+        date = normalized;
+        document.getElementById('cbDate').value = date; // reflect the normalized value back
+      }
 
-      renderChequebook();
-      updateNextChequeHint(); // REFINEMENT: re-suggest the next cheque no.
-      if(typeof updateCbDueBadge === 'function') updateCbDueBadge(); // PHASE 3
-      if(typeof showToast === 'function') showToast('✅ Cheque saved', 'green');
+      if(!date || !chequeNo || !(unknownPayeeChecked || payee) || !(amountRs > 0)){
+        if(typeof showToast === 'function') showToast('⚠ Fill Date, Cheque No, Payee (or check "don\'t know payee") and Amount (Rs.)', 'red');
+        else alert('Fill Date, Cheque No, Payee (or check "don\'t know payee") and Amount (Rs.)');
+        return;
+      }
+
+      // UNKNOWN PAYEE FLAG: resolved once, used by both the add and edit
+      // payloads below. needsReview always follows the checkbox directly —
+      // so on an edit, unchecking the box and entering a real payee name
+      // clears needsReview back to false on that same update, exactly as
+      // required (no separate manual toggle needed).
+      const finalPayee = unknownPayeeChecked ? '❓ Unknown — ask manager' : payee;
+      const needsReview = unknownPayeeChecked;
+
+      if(_cbEditingId){
+        // EDIT FUNCTION: update the existing record in place. status is
+        // deliberately NOT included in this patch — it stays exclusively
+        // controlled by the existing toggleChequeStatus() Paid/Due toggle.
+        const editingId = _cbEditingId;
+        const record = await updateCheque(editingId, {
+          date: date, chequeNo: chequeNo, payee: finalPayee,
+          amountRs: amountRs, amountPaisa: amountPaisa, remarks: remarks,
+          needsReview: needsReview
+        });
+        if(record) _cbCache[record.id] = record;
+        _cbEditingId = null;
+
+        document.getElementById('cbChequeNo').value = '';
+        document.getElementById('cbPayee').value = '';
+        document.getElementById('cbAmountRs').value = '';
+        document.getElementById('cbAmountPaisa').value = '';
+        document.getElementById('cbRemarks').value = '';
+        if(unknownPayeeEl) unknownPayeeEl.checked = false;
+
+        if(btn) btn.textContent = '+ Save Cheque';
+        const banner = document.getElementById('cbEditBanner');
+        if(banner){ banner.style.display = 'none'; banner.innerHTML = ''; }
+
+        renderChequebook();
+        updateNextChequeHint(); // re-suggest the next cheque no., same as after a normal add
+        if(typeof updateCbDueBadge === 'function') updateCbDueBadge(); // PHASE 3
+        if(typeof showToast === 'function') showToast('✅ Cheque updated', 'green');
+      } else {
+        const record = await addCheque({
+          date: date, chequeNo: chequeNo, payee: finalPayee,
+          amountRs: amountRs, amountPaisa: amountPaisa,
+          remarks: remarks, status: 'due', needsReview: needsReview
+        });
+        _cbCache[record.id] = record;
+
+        document.getElementById('cbChequeNo').value = '';
+        document.getElementById('cbPayee').value = '';
+        document.getElementById('cbAmountRs').value = '';
+        document.getElementById('cbAmountPaisa').value = '';
+        document.getElementById('cbRemarks').value = '';
+        if(unknownPayeeEl) unknownPayeeEl.checked = false;
+        // Date is deliberately left as-is — issuing several cheques on
+        // the same date is common, same reasoning as beDate/rcDate.
+
+        renderChequebook();
+        updateNextChequeHint(); // REFINEMENT: re-suggest the next cheque no.
+        if(typeof updateCbDueBadge === 'function') updateCbDueBadge(); // PHASE 3
+        if(typeof showToast === 'function') showToast('✅ Cheque saved', 'green');
+      }
     } finally {
       if(btn) btn.disabled = false;
+      _cbSaving = false;
     }
+  };
+
+  // ── editCheque(id) ──
+  // Populates the entry form with an existing cheque's values and puts
+  // the form into "edit mode" (tracked via _cbEditingId). The Save
+  // button's label changes to "Update Cheque" and a Cancel banner
+  // appears. The cheque-no field is filled with the record's actual
+  // number (not the auto-suggested next number) — updateNextChequeHint()
+  // only auto-fills an *empty* field, so a populated field is left alone.
+  window.editCheque = function(id){
+    const c = _cbCache[id];
+    if(!c) return;
+
+    _cbEditingId = id;
+
+    document.getElementById('cbDate').value        = c.date || '';
+    document.getElementById('cbChequeNo').value     = c.chequeNo || '';
+    document.getElementById('cbPayee').value        = c.payee || '';
+    document.getElementById('cbAmountRs').value     = (c.amountRs || c.amountRs === 0) ? c.amountRs : '';
+    document.getElementById('cbAmountPaisa').value  = (c.amountPaisa || c.amountPaisa === 0) ? c.amountPaisa : '';
+    document.getElementById('cbRemarks').value      = c.remarks || '';
+    // UNKNOWN PAYEE FLAG: reflect the record's current needsReview state.
+    // The user typically unchecks this and types a real name, which
+    // clears needsReview on save (handled in saveCheque() above).
+    const unknownPayeeEl = document.getElementById('cbUnknownPayee');
+    if(unknownPayeeEl) unknownPayeeEl.checked = (c.needsReview === true);
+
+    const btn = document.getElementById('cbSaveBtn');
+    if(btn) btn.textContent = '✎ Update Cheque';
+
+    const banner = document.getElementById('cbEditBanner');
+    if(banner){
+      banner.innerHTML = 'Editing cheque #' + cbEsc(c.chequeNo) + ' — <a href="#" onclick="cancelCbEdit();return false;">Cancel</a>';
+      banner.style.display = 'block';
+    }
+
+    // Suppress the "next cheque no." hint while editing — it's not
+    // relevant to fixing an existing record's number.
+    const hint = document.getElementById('cbNextChequeHint');
+    if(hint) hint.style.display = 'none';
+
+    const entryRow = document.getElementById('cbEntryRow');
+    if(entryRow && entryRow.scrollIntoView) entryRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const dateEl = document.getElementById('cbDate');
+    if(dateEl) dateEl.focus();
+  };
+
+  // ── cancelCbEdit() ──
+  // Exits edit mode without saving anything: clears _cbEditingId, resets
+  // the form (date left as-is, same convention as after a normal save),
+  // restores the Save button label, hides the banner, and re-runs
+  // updateNextChequeHint() as if starting fresh.
+  window.cancelCbEdit = function(){
+    _cbEditingId = null;
+
+    document.getElementById('cbChequeNo').value = '';
+    document.getElementById('cbPayee').value = '';
+    document.getElementById('cbAmountRs').value = '';
+    document.getElementById('cbAmountPaisa').value = '';
+    document.getElementById('cbRemarks').value = '';
+    const unknownPayeeEl = document.getElementById('cbUnknownPayee');
+    if(unknownPayeeEl) unknownPayeeEl.checked = false;
+
+    const btn = document.getElementById('cbSaveBtn');
+    if(btn) btn.textContent = '+ Save Cheque';
+
+    const banner = document.getElementById('cbEditBanner');
+    if(banner){ banner.style.display = 'none'; banner.innerHTML = ''; }
+
+    updateNextChequeHint();
   };
 
   // ── toggleChequeStatus(id) ── flips due↔paid, re-renders just the list
@@ -8885,6 +9048,81 @@ function importFromExcel(input){
     if(typeof checkDueChequeReminders === 'function') checkDueChequeReminders();
   };
 
+  // ── getCbNeedsReviewCount() ──
+  // Count of all-time cheques flagged needsReview === true (not FY-scoped,
+  // same reasoning as getDueReminders() itself). Read directly from
+  // _cbCache, which loadChequebook() populates with every record.
+  function getCbNeedsReviewCount(){
+    let n = 0;
+    Object.values(_cbCache).forEach(function(c){
+      if(c && c.needsReview === true) n++;
+    });
+    return n;
+  }
+  window.getCbNeedsReviewCount = getCbNeedsReviewCount;
+
+  // ── getChequeNoGaps() ──
+  // Looks at every purely-numeric cheque number across ALL records
+  // (all-time, not FY-scoped — a physical cheque book doesn't respect
+  // fiscal-year boundaries), dedupes, sorts ascending, and walks
+  // consecutive pairs. A gap of 2-10 (inclusive) is flagged as
+  // "possibly missing" — every missing number in that range is listed.
+  // A gap larger than 10 is treated as the start of a new cheque book
+  // and is NOT flagged, since that's expected/normal, not an anomaly.
+  // Returns [{from, to, afterChequeNo, beforeChequeNo, missing}], where
+  // afterChequeNo/beforeChequeNo are the original (possibly zero-padded)
+  // strings as entered, and missing numbers are padded to match the
+  // digit width of afterChequeNo (the cheque book on that side of the gap).
+  function getChequeNoGaps(){
+    const seen = {}; // numeric value -> first-seen raw string (preserves e.g. leading zeros)
+    Object.values(_cbCache).forEach(function(c){
+      if(!c || !c.chequeNo) return;
+      const trimmed = String(c.chequeNo).trim();
+      if(!/^\d+$/.test(trimmed)) return; // only purely-numeric cheque numbers count
+      const n = parseInt(trimmed, 10);
+      if(!(n in seen)) seen[n] = trimmed;
+    });
+
+    const nums = Object.keys(seen).map(Number).sort(function(a,b){ return a-b; });
+    const gaps = [];
+    for(let i=0; i<nums.length-1; i++){
+      const a = nums[i], b = nums[i+1];
+      const diff = b - a;
+      if(diff >= 2 && diff <= 10){
+        const width = seen[a].length;
+        const missing = [];
+        for(let n=a+1; n<b; n++) missing.push(String(n).padStart(width,'0'));
+        gaps.push({ from: a+1, to: b-1, afterChequeNo: seen[a], beforeChequeNo: seen[b], missing: missing });
+      }
+      // diff === 1 → consecutive, no gap. diff > 10 → treated as a new
+      // cheque book starting — expected, not flagged.
+    }
+    return gaps;
+  }
+  window.getChequeNoGaps = getChequeNoGaps;
+
+  // ── checkChequeNoGaps() ──
+  // Button handler for "🔍 Check for Missing Cheques" — purely
+  // informational, no auto-fill. Renders each flagged range in plain
+  // language into #cbGapPanel.
+  window.checkChequeNoGaps = function(){
+    const panel = document.getElementById('cbGapPanel');
+    if(!panel) return;
+
+    const gaps = getChequeNoGaps();
+    if(!gaps.length){
+      panel.innerHTML = '<div style="font-size:12px;color:var(--muted)">✅ No likely-missing cheque numbers found (jumps larger than 10 are treated as a new cheque book, not flagged).</div>';
+    } else {
+      let html = '<div style="font-size:12px;font-weight:600;margin-bottom:4px">🔍 Possibly missing cheques:</div><ul style="margin:0 0 0 18px;padding:0;font-size:12px">';
+      gaps.forEach(function(g){
+        html += '<li style="margin-bottom:4px">Between cheque ' + cbEsc(g.afterChequeNo) + ' and ' + cbEsc(g.beforeChequeNo) + ' — missing: ' + g.missing.map(cbEsc).join(', ') + '</li>';
+      });
+      html += '</ul>';
+      panel.innerHTML = html;
+    }
+    panel.style.display = 'block';
+  };
+
 })();
 </script>
 
@@ -8923,10 +9161,15 @@ function importFromExcel(input){
 (function(){
 
   // ── updateCbDueBadge() ──
+  // Combined count: overdue reminders + needs-review (unknown payee)
+  // cheques share this one badge, per explicit decision — no separate
+  // indicator. Refresh points are unchanged (after save/toggle/remove/init).
   window.updateCbDueBadge = function(){
     const badge = document.getElementById('cbDueBadge');
     if(!badge) return;
-    const n = (typeof getDueReminders === 'function') ? getDueReminders().length : 0;
+    const dueCount = (typeof getDueReminders === 'function') ? getDueReminders().length : 0;
+    const reviewCount = (typeof getCbNeedsReviewCount === 'function') ? getCbNeedsReviewCount() : 0;
+    const n = dueCount + reviewCount;
     if(n > 0){
       badge.textContent = String(n);
       badge.style.display = '';
